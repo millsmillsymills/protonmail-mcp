@@ -13,3 +13,6 @@
 *.test
 *.out
 coverage.txt
+
+# Compound Engineering
+.compound-engineering/*.local.yaml
