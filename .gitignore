@@ -1,0 +1,15 @@
+# Binaries
+/protonmail-mcp
+/dist/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# Go
+*.test
+*.out
+coverage.txt
