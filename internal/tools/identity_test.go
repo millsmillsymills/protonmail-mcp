@@ -4,12 +4,10 @@ import (
 	"context"
 	"testing"
 
-	"github.com/zalando/go-keyring"
-	"protonmail-mcp/internal/tools/internal/testharness"
+	"protonmail-mcp/internal/testharness"
 )
 
 func TestWhoamiRoundTrip(t *testing.T) {
-	keyring.MockInit()
 	h := testharness.Boot(t, "user@example.test", "hunter2")
 	defer h.Close()
 
