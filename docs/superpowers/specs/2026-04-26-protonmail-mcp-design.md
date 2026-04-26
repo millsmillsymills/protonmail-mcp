@@ -64,6 +64,7 @@ These were settled during brainstorming and are inputs, not open questions.
 | 8 | One `*proton.Client` per process; lazy session bootstrap on first MCP call | Simpler than a worker pool; matches v3 needs without re-architecture. |
 | 9 | Tool DTOs decoupled from `go-proton-api` types | Insulates tool schemas from upstream drift. |
 | 10 | Future hook for `--no-store-totp` mode in v2+ | TOTP-on-disk is the user's stated future preference; design accommodates without building. |
+| 11 | **Hybrid client architecture.** `go-proton-api` for auth/SRP/2FA/HV/token refresh and natively supported endpoints; plain `resty` (Go HTTP) for endpoints `go-proton-api` doesn't expose. | Coverage check during planning revealed `go-proton-api` does not implement custom-domain CRUD or address creation; underlying `Client.do()` / `Manager.r()` are unexported, so an in-library escape hatch isn't available. Forking is more maintenance burden than owning ~5 endpoint shapes ourselves. Endpoint URLs and payload shapes are sourced from the open-source [`ProtonMail/WebClients`](https://github.com/ProtonMail/WebClients) monorepo. |
 
 ---
 
@@ -80,9 +81,10 @@ protonmail-mcp status                (prints session state, no secrets)
 
 1. **MCP transport** (`internal/server`) — Go MCP SDK; JSON-RPC, tool registration, schemas, errors.
 2. **Tool registry** (`internal/tools`) — declarative tools with name, description, JSON schema, handler. Read tools always registered; write tools registered only when `PROTONMAIL_MCP_ENABLE_WRITES=1`.
-3. **Session manager** (`internal/session`) — owns the single `*proton.Client`. Loads session from keychain on first call; refreshes auth tokens on 401; surfaces clear errors when the session is unrecoverable.
+3. **Session manager** (`internal/session`) — owns the single `*proton.Client` **and** a raw `*resty.Client` wired to the same access token. Both surfaces share one auth lifecycle (login, refresh, logout). Loads session from keychain on first call; refreshes auth tokens on 401; surfaces clear errors when the session is unrecoverable.
 4. **Keychain adapter** (`internal/keychain`) — wraps `zalando/go-keyring`. Service name `protonmail-mcp`.
-5. **`go-proton-api`** — vendored dependency.
+5. **`go-proton-api`** — vendored dependency. Used for auth + natively-supported endpoints.
+6. **`go-resty/resty/v2`** — direct dependency. Used for the handful of Proton endpoints `go-proton-api` doesn't expose: custom-domain CRUD, address creation. One package — `internal/protonraw` — owns those request/response shapes and is the only place that talks raw HTTP.
 
 **One process, no background workers.** Session refresh happens lazily in the request path, not on a timer.
 
@@ -95,7 +97,8 @@ protonmail-mcp status                (prints session state, no secrets)
 | `cmd/protonmail-mcp` | Entry point. Parses subcommand. Wires layers. | All below |
 | `internal/server` | MCP transport. Registers tools, dispatches calls, formats responses. Does not touch Proton directly. | `tools`, MCP Go SDK |
 | `internal/tools` | Tool definitions. One file per resource (`addresses.go`, `domains.go`, `settings.go`, `keys.go`, `identity.go`). Read tools registered always; writes gated by env flag at registration time. | `session`, `proterr` |
-| `internal/session` | Owns `*proton.Client`. Methods: `Get(ctx)`, `Login(ctx, username, password, totp)`, `Logout()`. | `keychain`, `go-proton-api` |
+| `internal/session` | Owns `*proton.Client` **and** `*resty.Client` (raw). Methods: `Client(ctx)` (go-proton-api client), `Raw(ctx)` (raw resty wired to same token), `Login(ctx, username, password, totp)`, `Logout()`. Token rotation flows through one place: a `proton.AuthHandler` callback updates both the keychain and the raw client's bearer token. | `keychain`, `go-proton-api`, `resty` |
+| `internal/protonraw` | Hand-written client for the ~5 endpoints not in `go-proton-api`: `ListCustomDomains`, `GetCustomDomain`, `AddCustomDomain`, `VerifyCustomDomain`, `RemoveCustomDomain`, `CreateAddress`. Each method accepts a `*resty.Client` from the session and returns shaped DTOs. Endpoint paths and payload shapes documented inline with WebClients references. | `resty` |
 | `internal/keychain` | Persistence for credentials and tokens. Six known keys under one service name. Methods: `LoadCreds`, `SaveCreds`, `LoadSession`, `SaveSession`, `Clear`. | `zalando/go-keyring` |
 | `internal/proterr` | Translates `go-proton-api` errors and HTTP statuses into stable MCP error codes. | — |
 | `internal/log` | `slog`-based logger with field-allowlist redaction handler. | — |
@@ -278,6 +281,7 @@ One taxonomy, one mapping point (`internal/proterr`), one rule: never leak crede
 | Log redaction | slog handler with field allowlist. |
 | Public key handling | Armored public keys are not sensitive; surfaced freely. **Private keys never leave `go-proton-api`'s in-memory state.** No tool exports a private key. |
 | Process surface | Single binary. No daemon, no IPC socket, no HTTP listener. Stdio only. |
+| Hybrid-client surface | The raw `resty.Client` shares the same bearer token as `go-proton-api`'s client; no separate credentials. Token rotation goes through a single `AuthHandler` callback that updates both. `internal/protonraw` only sets request bodies via `resty.SetBody` (struct → JSON marshal); no string concatenation into URLs or payloads. |
 
 ### Explicitly not doing
 
@@ -301,9 +305,10 @@ One taxonomy, one mapping point (`internal/proterr`), one rule: never leak crede
 
 ### Integration tests (`integration/*_test.go`, build tag `integration`)
 
-- Start `go-proton-api` dev server in-process; point session manager at it; exercise every tool.
+- Start `go-proton-api` dev server in-process; point session manager at it; exercise every tool that uses go-proton-api natively.
 - Auth flow: SRP login against the fake server, including the 2FA path.
 - Session refresh: force token expiry; assert auto-refresh succeeds.
+- **`internal/protonraw` tests use `httptest.Server`** — the go-proton-api dev server does not implement custom-domain or address-create endpoints, so we stub them with `net/http/httptest`. Each owned endpoint gets a fixture pair (request shape, response shape). Real-server validation lives in the manual checklist.
 
 ### Manual checklist (`docs/testing-checklist.md`, run before releases)
 
@@ -348,6 +353,10 @@ protonmail-mcp/
 │   │   └── refresh.go              (token refresh helpers)
 │   ├── keychain/
 │   │   └── keychain.go             (Save/Load/Clear)
+│   ├── protonraw/
+│   │   ├── client.go               (resty wiring + helpers)
+│   │   ├── domains.go              (custom domain CRUD)
+│   │   └── addresses.go            (CreateAddress only)
 │   ├── proterr/
 │   │   └── proterr.go              (error mapping)
 │   └── log/
@@ -381,6 +390,7 @@ Decisions paying off in later phases:
 - **TOTP-on-prompt mode** (`--no-store-totp`): user's stated future preference. Hook is in the session manager; build when requested.
 - **Bridge coexistence note.** Running this MCP and proton-bridge against the same account simultaneously *should* work (different auth sessions), but Proton's anti-abuse layer might rate-limit or HV-challenge if patterns look unusual. Documented caveat, not engineered around.
 - **`proton_revoke_address_key`** — deferred from v1; revisit if a concrete need surfaces.
+- **Upstream contributions to `go-proton-api`.** If we end up maintaining `internal/protonraw` long-term, opening PRs to add `Client.CreateAddress`, custom-domain CRUD, and an exported raw-request helper would shrink our maintenance surface. Proton's README says they "are not actively looking for contributors," so this is best-effort.
 
 ---
 
