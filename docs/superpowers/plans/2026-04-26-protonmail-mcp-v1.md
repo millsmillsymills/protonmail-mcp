@@ -740,6 +740,32 @@ func TestLoadCredsMissing(t *testing.T) {
 		t.Fatalf("expected error when keychain is empty")
 	}
 }
+
+func TestSaveCredsClearsStaleTOTP(t *testing.T) {
+	keyring.MockInit()
+	kc := keychain.New()
+
+	// First login: TOTP is set.
+	if err := kc.SaveCreds(keychain.Creds{Username: "u", Password: "p", TOTPSecret: "JBSWY3DPEHPK3PXP"}); err != nil {
+		t.Fatalf("first SaveCreds: %v", err)
+	}
+	got, err := kc.LoadCreds()
+	if err != nil || got.TOTPSecret != "JBSWY3DPEHPK3PXP" {
+		t.Fatalf("first LoadCreds: got=%+v err=%v", got, err)
+	}
+
+	// Second login: same user, TOTP NOT supplied (one-shot code path).
+	if err := kc.SaveCreds(keychain.Creds{Username: "u", Password: "p"}); err != nil {
+		t.Fatalf("second SaveCreds: %v", err)
+	}
+	got, err = kc.LoadCreds()
+	if err != nil {
+		t.Fatalf("second LoadCreds: %v", err)
+	}
+	if got.TOTPSecret != "" {
+		t.Fatalf("stale TOTP survived second login: got=%q", got.TOTPSecret)
+	}
+}
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -799,11 +825,17 @@ func (k *Keychain) SaveCreds(c Creds) error {
 	if err := keyring.Set(service, keyPassword, c.Password); err != nil {
 		return fmt.Errorf("save password: %w", err)
 	}
-	// TOTP secret is optional.
-	if c.TOTPSecret != "" {
-		if err := keyring.Set(service, keyTOTPSecret, c.TOTPSecret); err != nil {
-			return fmt.Errorf("save totp: %w", err)
+	// TOTP secret is optional. When the caller supplies an empty string, drop
+	// any pre-existing entry so a stale secret from a prior login can't bleed
+	// through. Tolerate ErrNotFound (no entry to delete).
+	if c.TOTPSecret == "" {
+		if err := keyring.Delete(service, keyTOTPSecret); err != nil && !errors.Is(err, keyring.ErrNotFound) {
+			return fmt.Errorf("clear stale totp: %w", err)
 		}
+		return nil
+	}
+	if err := keyring.Set(service, keyTOTPSecret, c.TOTPSecret); err != nil {
+		return fmt.Errorf("save totp: %w", err)
 	}
 	return nil
 }

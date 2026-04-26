@@ -47,11 +47,17 @@ func (k *Keychain) SaveCreds(c Creds) error {
 	if err := keyring.Set(service, keyPassword, c.Password); err != nil {
 		return fmt.Errorf("save password: %w", err)
 	}
-	// TOTP secret is optional.
-	if c.TOTPSecret != "" {
-		if err := keyring.Set(service, keyTOTPSecret, c.TOTPSecret); err != nil {
-			return fmt.Errorf("save totp: %w", err)
+	// TOTP secret is optional. When the caller supplies an empty string, drop
+	// any pre-existing entry so a stale secret from a prior login can't bleed
+	// through. Tolerate ErrNotFound (no entry to delete).
+	if c.TOTPSecret == "" {
+		if err := keyring.Delete(service, keyTOTPSecret); err != nil && !errors.Is(err, keyring.ErrNotFound) {
+			return fmt.Errorf("clear stale totp: %w", err)
 		}
+		return nil
+	}
+	if err := keyring.Set(service, keyTOTPSecret, c.TOTPSecret); err != nil {
+		return fmt.Errorf("save totp: %w", err)
 	}
 	return nil
 }

@@ -50,3 +50,29 @@ func TestLoadCredsMissing(t *testing.T) {
 		t.Fatalf("expected error when keychain is empty")
 	}
 }
+
+func TestSaveCredsClearsStaleTOTP(t *testing.T) {
+	keyring.MockInit()
+	kc := keychain.New()
+
+	// First login: TOTP is set.
+	if err := kc.SaveCreds(keychain.Creds{Username: "u", Password: "p", TOTPSecret: "JBSWY3DPEHPK3PXP"}); err != nil {
+		t.Fatalf("first SaveCreds: %v", err)
+	}
+	got, err := kc.LoadCreds()
+	if err != nil || got.TOTPSecret != "JBSWY3DPEHPK3PXP" {
+		t.Fatalf("first LoadCreds: got=%+v err=%v", got, err)
+	}
+
+	// Second login: same user, TOTP NOT supplied (one-shot code path).
+	if err := kc.SaveCreds(keychain.Creds{Username: "u", Password: "p"}); err != nil {
+		t.Fatalf("second SaveCreds: %v", err)
+	}
+	got, err = kc.LoadCreds()
+	if err != nil {
+		t.Fatalf("second LoadCreds: %v", err)
+	}
+	if got.TOTPSecret != "" {
+		t.Fatalf("stale TOTP survived second login: got=%q", got.TOTPSecret)
+	}
+}
