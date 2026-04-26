@@ -2,7 +2,10 @@ module protonmail-mcp
 
 go 1.26.1
 
-require github.com/ProtonMail/go-proton-api v0.4.1-0.20260424150947-6bf7f5a61eb8
+require (
+	github.com/ProtonMail/go-proton-api v0.4.1-0.20260424150947-6bf7f5a61eb8
+	github.com/zalando/go-keyring v0.2.8
+)
 
 require (
 	github.com/ProtonMail/bcrypt v0.0.0-20211005172633-e235017c1baf // indirect
@@ -16,10 +19,12 @@ require (
 	github.com/bradenaw/juniper v0.15.3 // indirect
 	github.com/cloudflare/circl v1.6.2 // indirect
 	github.com/cronokirby/saferith v0.33.0 // indirect
+	github.com/danieljoos/wincred v1.2.3 // indirect
 	github.com/emersion/go-message v0.16.0 // indirect
 	github.com/emersion/go-textwrapper v0.0.0-20200911093747-65d896831594 // indirect
 	github.com/emersion/go-vcard v0.0.0-20230331202150-f3d26859ccd3 // indirect
 	github.com/go-resty/resty/v2 v2.17.2 // indirect
+	github.com/godbus/dbus/v5 v5.2.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/sirupsen/logrus v1.9.4 // indirect
