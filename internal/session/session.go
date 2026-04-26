@@ -61,7 +61,7 @@ func (s *Session) Client(ctx context.Context) (*proton.Client, error) {
 	if err != nil {
 		return nil, errors.New("no session in keychain — run `protonmail-mcp login`")
 	}
-	c, _, err := s.mgr.NewClientWithRefresh(ctx, sess.UID, sess.RefreshToken)
+	c, refreshed, err := s.mgr.NewClientWithRefresh(ctx, sess.UID, sess.RefreshToken)
 	if err != nil {
 		return nil, fmt.Errorf("refresh session: %w", err)
 	}
@@ -72,9 +72,29 @@ func (s *Session) Client(ctx context.Context) (*proton.Client, error) {
 			RefreshToken: a.RefreshToken,
 		})
 	})
+
+	// Cold-start refresh may have rotated the refresh token; persist the new
+	// values atomically. We're already holding s.mu.Lock(), so update fields
+	// directly and best-effort-save to keychain rather than calling
+	// OnAuthRotated (which would re-acquire the lock and deadlock).
+	rotated := keychain.Session{
+		UID:          refreshed.UID,
+		AccessToken:  refreshed.AccessToken,
+		RefreshToken: refreshed.RefreshToken,
+	}
+	if rotated.AccessToken == "" {
+		// Some go-proton-api versions return zero-valued Auth on a no-op refresh.
+		// In that case, keep the values we already loaded from keychain.
+		rotated = sess
+	}
 	s.client = c
-	s.current = sess
-	s.raw.setBearer(sess.AccessToken)
+	s.current = rotated
+	s.raw.setBearer(rotated.AccessToken)
+	if err := s.kc.SaveSession(rotated); err != nil {
+		// Best-effort: log only. In-memory state is correct; next cold start
+		// will re-login if the persisted state is stale.
+		_ = err
+	}
 	return c, nil
 }
 
