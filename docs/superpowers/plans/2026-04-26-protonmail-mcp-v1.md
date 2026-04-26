@@ -71,14 +71,20 @@ Until then, all imports in this plan use the bare `protonmail-mcp/...` form.
 Run:
 
 ```bash
-go get github.com/ProtonMail/go-proton-api@latest
+go get github.com/ProtonMail/go-proton-api@master
 go get github.com/modelcontextprotocol/go-sdk@latest
 go get github.com/zalando/go-keyring@latest
 go get github.com/go-resty/resty/v2@latest
 go mod tidy
 ```
 
-Expected: `go.mod` updated with concrete versions; `go.sum` created.
+Note: go-proton-api ships a stale v0.4.0 tag; downstream tasks need master HEAD. Master also uses a forked resty via a `replace` directive — Go does not propagate replace directives from dependencies, so mirror it in our own `go.mod`:
+
+```
+replace github.com/go-resty/resty/v2 => github.com/ProtonMail/resty/v2 v2.0.0-20250929142426-e3dc6308c80b
+```
+
+Expected: `go.mod` updated with concrete versions (`go-proton-api` shows a `v0.4.1-0.YYYYMMDD...` pseudo-version); `go.sum` created.
 
 - [ ] **Step 3: Write `.gitignore`**
 

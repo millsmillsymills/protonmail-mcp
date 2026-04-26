@@ -59,7 +59,7 @@ func Map(err error) *Error {
 	var apiErr *proton.APIError
 	if errors.As(err, &apiErr) {
 		// Human verification (CAPTCHA) — semantic meaning trumps status.
-		if apiErr.Code == proton.HumanVerificationRequired {
+		if apiErr.IsHVError() {
 			return &Error{
 				Code:    "proton/captcha",
 				Message: "Human verification required.",
