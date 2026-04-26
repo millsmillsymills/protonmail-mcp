@@ -23,7 +23,10 @@ type Session struct {
 }
 
 func New(apiURL string, kc *keychain.Keychain) *Session {
-	mgr := proton.New(proton.WithHostURL(apiURL))
+	mgr := proton.New(
+		proton.WithHostURL(apiURL),
+		proton.WithAppVersion(appVersionHeader()),
+	)
 	return &Session{
 		mgr: mgr,
 		kc:  kc,

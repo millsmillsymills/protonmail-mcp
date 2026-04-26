@@ -19,7 +19,7 @@ func newRawClient(baseURL string) *rawClient {
 	rc := resty.New().
 		SetBaseURL(baseURL).
 		SetHeader("Accept", "application/vnd.protonmail.v1+json").
-		SetHeader("x-pm-appversion", "Other")
+		SetHeader("x-pm-appversion", appVersionHeader())
 	return &rawClient{rc: rc}
 }
 

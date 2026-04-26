@@ -917,7 +917,10 @@ git commit -m "feat(keychain): typed Creds/Session wrappers around go-keyring"
 **Files:**
 - Create: `internal/session/session.go`
 - Create: `internal/session/raw.go`
+- Create: `internal/session/appversion.go`
 - Create: `internal/session/session_test.go`
+
+**`internal/session/appversion.go`:** Defines `appVersionHeader()` returning a Proton-acceptable `x-pm-appversion` value of the form `<api-os>-protonmail-mcp@<version>` (e.g. `macos-protonmail-mcp@0.1.0`). Proton parses the platform from the prefix before `-` and rejects unknown values (`go` → 400, code 2064). `runtime.GOOS` is mapped: `darwin`→`macos`, `windows`→`windows`, anything else→`linux`. Both `proton.New` (via `proton.WithAppVersion`) and the raw client share this single helper so the two surfaces send identical headers.
 
 **What this gives us:** A single object that owns the `*proton.Manager`, `*proton.Client`, and a `*resty.Client` (the raw one). Token rotation flows through one place: a `proton.AuthHandler` callback updates both the keychain and the raw client's bearer token. Tools call `s.Client(ctx)` for go-proton-api or `s.Raw(ctx)` for raw HTTP.
 
@@ -1033,7 +1036,10 @@ type Session struct {
 // New constructs a session that will load credentials from keychain on first
 // use. Returns immediately; no network calls happen until Client/Raw is called.
 func New(apiURL string, kc *keychain.Keychain) *Session {
-	mgr := proton.New(proton.WithHostURL(apiURL))
+	mgr := proton.New(
+		proton.WithHostURL(apiURL),
+		proton.WithAppVersion(appVersionHeader()), // see appversion.go
+	)
 	return &Session{
 		mgr: mgr,
 		kc:  kc,
@@ -1180,7 +1186,7 @@ func newRawClient(baseURL string) *rawClient {
 	rc := resty.New().
 		SetBaseURL(baseURL).
 		SetHeader("Accept", "application/vnd.protonmail.v1+json").
-		SetHeader("x-pm-appversion", "Other") // matches what proton-bridge sends
+		SetHeader("x-pm-appversion", appVersionHeader()) // see appversion.go
 	return &rawClient{rc: rc}
 }
 
