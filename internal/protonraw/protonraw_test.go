@@ -172,3 +172,16 @@ func TestErrorResponseSurfaced(t *testing.T) {
 		t.Fatalf("want error for non-1000 code, got nil")
 	}
 }
+
+func TestNon1000CodeWithoutErrorIsFailure(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Proton's quota/permission errors sometimes ship without a string Error.
+		_ = json.NewEncoder(w).Encode(map[string]any{"Code": 2011})
+	}))
+	defer srv.Close()
+
+	_, err := protonraw.AddCustomDomain(context.Background(), newFakeDoer(srv.URL), "example.com")
+	if err == nil {
+		t.Fatalf("want error for code 2011, got nil")
+	}
+}

@@ -7,7 +7,6 @@
 package protonraw
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 
@@ -28,8 +27,15 @@ func decode(resp *resty.Response, out any) error {
 		Code  int    `json:"Code"`
 		Error string `json:"Error"`
 	}
-	if err := json.Unmarshal(resp.Body(), &env); err == nil && env.Error != "" {
-		return fmt.Errorf("proton api: %s (code %d)", env.Error, env.Code)
+	if err := json.Unmarshal(resp.Body(), &env); err == nil {
+		if env.Error != "" {
+			return fmt.Errorf("proton api: %s (code %d)", env.Error, env.Code)
+		}
+		// Proton's success code is 1000. Non-zero non-1000 codes signal a
+		// business error that the API didn't accompany with a string Error.
+		if env.Code != 0 && env.Code != 1000 {
+			return fmt.Errorf("proton api: unexpected code %d", env.Code)
+		}
 	}
 	if out != nil {
 		if err := json.Unmarshal(resp.Body(), out); err != nil {
@@ -37,10 +43,4 @@ func decode(resp *resty.Response, out any) error {
 		}
 	}
 	return nil
-}
-
-// attachCtx is a tiny helper kept for symmetry with the planning notes.
-// (Currently unused; resty.Request.SetContext is called directly at the call site.)
-var _ = func(req *resty.Request, ctx context.Context) *resty.Request {
-	return req.SetContext(ctx)
 }
