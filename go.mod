@@ -4,7 +4,9 @@ go 1.26.1
 
 require (
 	github.com/ProtonMail/go-proton-api v0.4.1-0.20260424150947-6bf7f5a61eb8
+	github.com/ProtonMail/gopenpgp/v2 v2.10.0-proton
 	github.com/go-resty/resty/v2 v2.17.2
+	github.com/modelcontextprotocol/go-sdk v1.5.0
 	github.com/zalando/go-keyring v0.2.8
 	golang.org/x/term v0.41.0
 )
@@ -15,7 +17,6 @@ require (
 	github.com/ProtonMail/go-crypto v1.4.1-proton // indirect
 	github.com/ProtonMail/go-mime v0.0.0-20230322103455-7d82a3887f2f // indirect
 	github.com/ProtonMail/go-srp v0.0.7 // indirect
-	github.com/ProtonMail/gopenpgp/v2 v2.10.0-proton // indirect
 	github.com/PuerkitoBio/goquery v1.12.0 // indirect
 	github.com/andybalholm/cascadia v1.3.3 // indirect
 	github.com/bradenaw/juniper v0.15.3 // indirect
@@ -28,7 +29,6 @@ require (
 	github.com/godbus/dbus/v5 v5.2.2 // indirect
 	github.com/google/jsonschema-go v0.4.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/modelcontextprotocol/go-sdk v1.5.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/segmentio/asm v1.1.3 // indirect
 	github.com/segmentio/encoding v0.5.4 // indirect

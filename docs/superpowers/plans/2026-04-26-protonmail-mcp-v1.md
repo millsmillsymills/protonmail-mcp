@@ -1988,6 +1988,8 @@ git commit -m "feat(tools): registry + identity tools (whoami, session_status)"
 
 > **Note on `proton_update_address`.** Display name and signature for an address actually flow through `mail_settings`-shaped endpoints in go-proton-api, not the address itself. We expose it as a tool that calls `Client.SetDisplayName` / `Client.SetSignature` based on which fields are set in the input. The "address ID" is captured in the request and forwarded to the appropriate setter.
 
+> **API drift (verified 2026-04-26 against go-proton-api v0.4.1-…-6bf7f5a61eb8):** the actual `proton.Address` struct does NOT expose `Signature` or `DomainID`. The implementation drops those fields from `addressDTO` and instead exposes `Send`/`Receive` (both `Bool`), keeping the rest of the tool contract intact.
+
 - [ ] **Step 1: Implement `internal/tools/addresses.go`**
 
 ```go
@@ -2446,6 +2448,11 @@ git commit -m "feat(tools): custom domain tools (5) via protonraw"
 
 > **Important shape note.** `go-proton-api`'s `MailSettings` / `UserSettings` have many fields. Rather than echoing the entire struct (which leaks `go-proton-api` types into the MCP contract), this tool surfaces a pragmatic subset. See the comments inline. The tool's update handler accepts a partial-update map (every field optional) and routes to the right `Set*` method.
 
+> **API drift (verified 2026-04-26):** `proton.MailSettings` no longer exposes `AutoSaveContacts`, `HideEmbeddedImages`, or `HideRemoteImages`; `proton.UserSettings` no longer exposes `Locale`, `WeeklyEmail`, or `News`. `Client.SetUserSettingsLocale` does not exist. The implementation:
+> - `mailSettingsDTO` now mirrors `{DisplayName, Signature, DraftMIMEType, AttachPublicKey, Sign, PGPScheme}`.
+> - `coreSettingsDTO` now mirrors `{Telemetry, CrashReports}` (the only two fields on `UserSettings`).
+> - `proton_update_core_settings` accepts `telemetry` and `crash_reports` booleans (routed through `SetUserSettingsTelemetry` / `SetUserSettingsCrashReports`) instead of `locale`.
+
 - [ ] **Step 1: Implement `internal/tools/settings.go`**
 
 ```go
@@ -2631,14 +2638,14 @@ git commit -m "feat(tools): mail + core settings tools (4)"
 **Files:**
 - Modify: `internal/tools/keys.go` (replace stub)
 
-**Tools added:** `proton_list_address_keys`, `proton_generate_address_key`, `proton_set_primary_address_key`.
+**Tools added:** `proton_list_address_keys` (v1 ships read-only).
 
-> **Verification step.** `go-proton-api` has `keys.go` and `keyring.go`. The relevant `Client` methods (likely `MakeAndCreateAddressKey`, `MakeKeyPrimary` or similar) need to be confirmed before implementation:
-> ```
-> go doc github.com/ProtonMail/go-proton-api Client.MakeAndCreateAddressKey
-> go doc github.com/ProtonMail/go-proton-api Client.MakeAddressKeyPrimary
-> ```
-> If methods are named differently or require additional args (e.g., a passphrase / unlocked keyring), adjust the implementation. **If generation requires an unlocked PGP keyring derived from the user's mailbox password, that's a meaningful complexity** — consider deferring `proton_generate_address_key` and `proton_set_primary_address_key` to v1.5 and shipping only `proton_list_address_keys` in v1. **The maintainer should make this call after running the `go doc` checks above.**
+> **API drift (verified 2026-04-26):**
+> - `Client.MakeAndCreateAddressKey` does NOT exist. `Client.CreateAddressKey` and `Client.CreateLegacyAddressKey` exist but take a `CreateAddressKeyReq` whose construction requires keyring/crypto operations.
+> - `Client.MakeAddressKeyPrimary(ctx, keyID, KeyList)` and `Client.DeleteAddressKey(ctx, keyID, KeyList)` both require a signed `KeyList`, which requires unlocking the user's keyring with the account passphrase.
+> - `proton.Key` no longer exposes `Fingerprint`, `Algorithm`, or `PublicKey` fields — only `{ID, PrivateKey, Token, Signature, Primary, Active, Flags}`. `Primary` and `Active` are `proton.Bool` (Go bool wrapper), not int.
+>
+> **v1 implementation:** keys are read-only. `proton_list_address_keys` derives `fingerprint` and `public_key_armored` best-effort by parsing `Key.PrivateKey` via `gopenpgp/v2/crypto.NewKey` (no passphrase needed for public-key extraction). Write tools (`proton_generate_address_key`, `proton_set_primary_address_key`) are deferred to v1.5 because they require keyring unlock plumbing.
 
 - [ ] **Step 1: Implement `internal/tools/keys.go` (read only by default; gates writes per verification)**
 
