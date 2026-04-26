@@ -1,9 +1,11 @@
 package proterr_test
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 
 	proton "github.com/ProtonMail/go-proton-api"
@@ -64,6 +66,41 @@ func TestHVError(t *testing.T) {
 	got := proterr.Map(apiErr)
 	if got == nil || got.Code != "proton/captcha" {
 		t.Fatalf("want proton/captcha, got %+v", got)
+	}
+}
+
+func TestMapHandlesValueAPIError(t *testing.T) {
+	// Wrap a value APIError (not a pointer) to confirm errors.As fallback works.
+	err := fmt.Errorf("wrapped: %w", proton.APIError{Status: http.StatusUnauthorized})
+	got := proterr.Map(err)
+	if got == nil || got.Code != "proton/auth_required" {
+		t.Fatalf("want proton/auth_required, got %+v", got)
+	}
+}
+
+func TestMapHandlesValueAPIErrorHV(t *testing.T) {
+	err := fmt.Errorf("wrapped: %w", proton.APIError{Code: proton.HumanVerificationRequired})
+	got := proterr.Map(err)
+	if got == nil || got.Code != "proton/captcha" {
+		t.Fatalf("want proton/captcha, got %+v", got)
+	}
+}
+
+func TestHVErrorIncludesToken(t *testing.T) {
+	rawDetails, _ := json.Marshal(map[string]any{
+		"HumanVerificationMethods": []string{"captcha"},
+		"HumanVerificationToken":   "tok-abc",
+	})
+	apiErr := proton.APIError{Code: proton.HumanVerificationRequired, Details: proton.ErrDetails(rawDetails)}
+	got := proterr.Map(apiErr)
+	if got == nil || got.Code != "proton/captcha" {
+		t.Fatalf("want proton/captcha, got %+v", got)
+	}
+	if !strings.Contains(got.Hint, "tok-abc") {
+		t.Errorf("hint missing token: %q", got.Hint)
+	}
+	if !strings.Contains(got.Hint, "captcha") {
+		t.Errorf("hint missing methods: %q", got.Hint)
 	}
 }
 

@@ -55,18 +55,17 @@ func Map(err error) *Error {
 	}
 
 	// Proton API error: carries the HTTP status. Check before NetError because
-	// the resty pipeline wraps APIError with fmt.Errorf(...%w...).
-	var apiErr *proton.APIError
-	if errors.As(err, &apiErr) {
+	// the resty pipeline wraps APIError with fmt.Errorf(...%w...). go-proton-api
+	// can wrap APIError as either a value or a pointer (Error() is on the value
+	// receiver), so probe both forms via extractAPIError.
+	if apiErr, ok := extractAPIError(err); ok {
 		// Human verification (CAPTCHA) — semantic meaning trumps status.
 		if apiErr.IsHVError() {
-			return &Error{
-				Code:    "proton/captcha",
-				Message: "Human verification required.",
-				Hint:    "Open the verification URL in a browser, then re-run `protonmail-mcp login`.",
-			}
+			return hvError(apiErr)
 		}
-		return mapStatus(apiErr.Status, nil)
+		if apiErr.Status != 0 {
+			return mapStatus(apiErr.Status, nil)
+		}
 	}
 
 	// Raw HTTP adapter (used by internal/protonraw and tests for Retry-After).
@@ -90,6 +89,40 @@ func Map(err error) *Error {
 		Code:    "proton/upstream",
 		Message: "Proton API unavailable.",
 		Hint:    err.Error(),
+	}
+}
+
+// extractAPIError returns the proton.APIError carried by err, whether wrapped
+// as a value or a pointer. ok is false if no APIError is present.
+func extractAPIError(err error) (proton.APIError, bool) {
+	var ptr *proton.APIError
+	if errors.As(err, &ptr) && ptr != nil {
+		return *ptr, true
+	}
+	var val proton.APIError
+	if errors.As(err, &val) {
+		return val, true
+	}
+	return proton.APIError{}, false
+}
+
+// hvError builds the *Error for an HV (CAPTCHA) APIError, surfacing the
+// verification token + methods so callers (Task 13: login) can construct the
+// verification URL for the user. The https://verify.proton.me/?... URL pattern
+// is reverse-engineered from Proton WebClients and may need maintenance if
+// Proton changes their verification host or query shape.
+func hvError(apiErr proton.APIError) *Error {
+	hint := "Open the verification URL in a browser, then re-run `protonmail-mcp login`."
+	if details, derr := apiErr.GetHVDetails(); derr == nil && details != nil && details.Token != "" {
+		methods := strings.Join(details.Methods, ",")
+		hint = "Human verification token=" + details.Token + " methods=" + methods +
+			". Open https://verify.proton.me/?methods=" + methods + "&token=" + details.Token +
+			" in a browser, complete the challenge, then re-run `protonmail-mcp login`."
+	}
+	return &Error{
+		Code:    "proton/captcha",
+		Message: "Human verification required.",
+		Hint:    hint,
 	}
 }
 
