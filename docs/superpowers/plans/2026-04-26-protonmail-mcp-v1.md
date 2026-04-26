@@ -1044,7 +1044,6 @@ func New(apiURL string, kc *keychain.Keychain) *Session {
 // NewForTesting bypasses keychain load and seeds an existing Session directly.
 // Used by unit tests to avoid the SRP login dance.
 func NewForTesting(apiURL string, seed keychain.Session) (*Session, error) {
-	keychain.New() // ensure mock keychain is usable
 	kc := keychain.New()
 	if err := kc.SaveSession(seed); err != nil {
 		return nil, fmt.Errorf("seed keychain: %w", err)
@@ -1095,8 +1094,15 @@ func (s *Session) Client(ctx context.Context) (*proton.Client, error) {
 // Raw returns a resty.Client wired to the current bearer token. Callers should
 // not memoize the returned client across rotations — get a fresh one per call.
 func (s *Session) Raw(ctx context.Context) *rawClient {
-	// Lazy bootstrap if Client() hasn't been called yet.
-	if s.client == nil {
+	s.mu.RLock()
+	hasClient := s.client != nil
+	s.mu.RUnlock()
+	hasBearer := s.raw.hasBearer()
+	// Only force a refresh through Client() if we have no bearer yet (cold
+	// start: keychain holds tokens but we haven't refreshed yet). If a bearer
+	// was seeded directly (e.g. via NewForTesting or Login), skip the refresh —
+	// the proton.Client will be lazily initialized on its own first use.
+	if !hasClient && !hasBearer {
 		_, _ = s.Client(ctx) // ignore error; raw will fail on the actual request
 	}
 	return s.raw
@@ -1174,6 +1180,13 @@ func (r *rawClient) R() *resty.Request {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	return r.rc.R()
+}
+
+// hasBearer reports whether a non-empty bearer token is currently set.
+func (r *rawClient) hasBearer() bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.bear != ""
 }
 ```
 
