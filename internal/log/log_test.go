@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"log/slog"
-	"strings"
 	"testing"
 
 	mcplog "protonmail-mcp/internal/log"
@@ -63,11 +62,42 @@ func TestRedactsNestedGroups(t *testing.T) {
 	logger.Info("nested",
 		slog.Group("auth", "access_token", "leak", "user", "andy"),
 	)
-	out := buf.String()
-	if strings.Contains(out, "leak") {
-		t.Errorf("nested token not redacted: %s", out)
+
+	var rec map[string]any
+	if err := json.Unmarshal(stripPrefix(buf.Bytes()), &rec); err != nil {
+		t.Fatalf("not valid JSON: %v\noutput: %s", err, buf.String())
 	}
-	if !strings.Contains(out, "andy") {
-		t.Errorf("nested non-sensitive field was lost: %s", out)
+	auth, ok := rec["auth"].(map[string]any)
+	if !ok {
+		t.Fatalf("auth group missing or not an object: %#v", rec["auth"])
+	}
+	if got, _ := auth["access_token"].(string); got != "<redacted>" {
+		t.Errorf("auth.access_token: want <redacted>, got %q", got)
+	}
+	if got, _ := auth["user"].(string); got != "andy" {
+		t.Errorf("auth.user: want \"andy\", got %q", got)
+	}
+}
+
+func TestRedactsDoublyNestedGroups(t *testing.T) {
+	var buf bytes.Buffer
+	logger := mcplog.New(slog.LevelDebug, &buf)
+	logger.Info("doubly nested",
+		slog.Group("outer",
+			slog.Group("inner", "secret", "leak", "ok", "fine"),
+		),
+	)
+
+	var rec map[string]any
+	if err := json.Unmarshal(stripPrefix(buf.Bytes()), &rec); err != nil {
+		t.Fatalf("not valid JSON: %v\noutput: %s", err, buf.String())
+	}
+	outer, _ := rec["outer"].(map[string]any)
+	inner, _ := outer["inner"].(map[string]any)
+	if got, _ := inner["secret"].(string); got != "<redacted>" {
+		t.Errorf("outer.inner.secret: want <redacted>, got %q", got)
+	}
+	if got, _ := inner["ok"].(string); got != "fine" {
+		t.Errorf("outer.inner.ok: want \"fine\", got %q", got)
 	}
 }

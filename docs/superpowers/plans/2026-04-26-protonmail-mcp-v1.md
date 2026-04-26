@@ -233,12 +233,43 @@ func TestRedactsNestedGroups(t *testing.T) {
 	logger.Info("nested",
 		slog.Group("auth", "access_token", "leak", "user", "andy"),
 	)
-	out := buf.String()
-	if strings.Contains(out, "leak") {
-		t.Errorf("nested token not redacted: %s", out)
+
+	var rec map[string]any
+	if err := json.Unmarshal(stripPrefix(buf.Bytes()), &rec); err != nil {
+		t.Fatalf("not valid JSON: %v\noutput: %s", err, buf.String())
 	}
-	if !strings.Contains(out, "andy") {
-		t.Errorf("nested non-sensitive field was lost: %s", out)
+	auth, ok := rec["auth"].(map[string]any)
+	if !ok {
+		t.Fatalf("auth group missing or not an object: %#v", rec["auth"])
+	}
+	if got, _ := auth["access_token"].(string); got != "<redacted>" {
+		t.Errorf("auth.access_token: want <redacted>, got %q", got)
+	}
+	if got, _ := auth["user"].(string); got != "andy" {
+		t.Errorf("auth.user: want \"andy\", got %q", got)
+	}
+}
+
+func TestRedactsDoublyNestedGroups(t *testing.T) {
+	var buf bytes.Buffer
+	logger := mcplog.New(slog.LevelDebug, &buf)
+	logger.Info("doubly nested",
+		slog.Group("outer",
+			slog.Group("inner", "secret", "leak", "ok", "fine"),
+		),
+	)
+
+	var rec map[string]any
+	if err := json.Unmarshal(stripPrefix(buf.Bytes()), &rec); err != nil {
+		t.Fatalf("not valid JSON: %v\noutput: %s", err, buf.String())
+	}
+	outer, _ := rec["outer"].(map[string]any)
+	inner, _ := outer["inner"].(map[string]any)
+	if got, _ := inner["secret"].(string); got != "<redacted>" {
+		t.Errorf("outer.inner.secret: want <redacted>, got %q", got)
+	}
+	if got, _ := inner["ok"].(string); got != "fine" {
+		t.Errorf("outer.inner.ok: want \"fine\", got %q", got)
 	}
 }
 ```
@@ -283,7 +314,6 @@ func New(level slog.Level, w io.Writer) *slog.Logger {
 
 type redactingHandler struct {
 	inner slog.Handler
-	group string
 }
 
 func (h *redactingHandler) Enabled(ctx context.Context, l slog.Level) bool {
@@ -304,11 +334,11 @@ func (h *redactingHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	for i, a := range attrs {
 		red[i] = redactAttr(a)
 	}
-	return &redactingHandler{inner: h.inner.WithAttrs(red), group: h.group}
+	return &redactingHandler{inner: h.inner.WithAttrs(red)}
 }
 
 func (h *redactingHandler) WithGroup(name string) slog.Handler {
-	return &redactingHandler{inner: h.inner.WithGroup(name), group: name}
+	return &redactingHandler{inner: h.inner.WithGroup(name)}
 }
 
 func redactAttr(a slog.Attr) slog.Attr {

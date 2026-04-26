@@ -30,7 +30,6 @@ func New(level slog.Level, w io.Writer) *slog.Logger {
 
 type redactingHandler struct {
 	inner slog.Handler
-	group string
 }
 
 func (h *redactingHandler) Enabled(ctx context.Context, l slog.Level) bool {
@@ -51,11 +50,11 @@ func (h *redactingHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	for i, a := range attrs {
 		red[i] = redactAttr(a)
 	}
-	return &redactingHandler{inner: h.inner.WithAttrs(red), group: h.group}
+	return &redactingHandler{inner: h.inner.WithAttrs(red)}
 }
 
 func (h *redactingHandler) WithGroup(name string) slog.Handler {
-	return &redactingHandler{inner: h.inner.WithGroup(name), group: name}
+	return &redactingHandler{inner: h.inner.WithGroup(name)}
 }
 
 func redactAttr(a slog.Attr) slog.Attr {
