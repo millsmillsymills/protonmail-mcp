@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	mcplog "protonmail-mcp/internal/log"
 )
@@ -21,6 +22,18 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+
+	// Make Ctrl-C actually terminate even when blocked in a syscall (e.g. the
+	// password prompt's term.ReadPassword). NotifyContext alone only cancels ctx,
+	// which doesn't unblock the read. We exit with the conventional SIGINT code
+	// after a brief delay to let any deferred TTY restoration finish.
+	go func() {
+		<-ctx.Done()
+		// Give in-flight defers a chance, then exit. 50ms is enough for
+		// x/term's deferred Restore to run if it's mid-call.
+		time.Sleep(50 * time.Millisecond)
+		os.Exit(130)
+	}()
 
 	if len(os.Args) > 1 {
 		switch os.Args[1] {

@@ -55,8 +55,11 @@ func runLogin(ctx context.Context) error {
 		err = sess.Login(ctx, in)
 	}
 	if err != nil {
-		// Surface mapped errors helpfully.
-		if pe := proterr.Map(err); pe != nil {
+		// For login-time errors, only the CAPTCHA mapping carries useful info
+		// (verification URL/token). Other proterr classifications were authored
+		// for the always-on use path and produce confusing "session expired"
+		// hints during a fresh login. Surface the underlying error verbatim.
+		if pe := proterr.Map(err); pe != nil && pe.Code == "proton/captcha" {
 			return fmt.Errorf("%s: %s\n%s", pe.Code, pe.Message, pe.Hint)
 		}
 		return err
@@ -66,10 +69,13 @@ func runLogin(ctx context.Context) error {
 	return nil
 }
 
+// stdinReader is shared across prompt() calls so type-ahead survives
+// multiple sequential reads (e.g. email then a 2FA value pasted together).
+var stdinReader = bufio.NewReader(os.Stdin)
+
 func prompt(label string) (string, error) {
 	fmt.Print(label)
-	r := bufio.NewReader(os.Stdin)
-	line, err := r.ReadString('\n')
+	line, err := stdinReader.ReadString('\n')
 	if err != nil {
 		return "", err
 	}
