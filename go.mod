@@ -6,6 +6,7 @@ require (
 	github.com/ProtonMail/go-proton-api v0.4.1-0.20260424150947-6bf7f5a61eb8
 	github.com/go-resty/resty/v2 v2.17.2
 	github.com/zalando/go-keyring v0.2.8
+	golang.org/x/term v0.41.0
 )
 
 require (
@@ -33,7 +34,7 @@ require (
 	golang.org/x/exp v0.0.0-20260312153236-7ab1446f8b90 // indirect
 	golang.org/x/net v0.52.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
-	golang.org/x/sys v0.42.0 // indirect
+	golang.org/x/sys v0.43.0 // indirect
 	golang.org/x/text v0.36.0 // indirect
 )
 
