@@ -227,6 +227,43 @@ func TestUpdateCatchAllDisable(t *testing.T) {
 	}
 }
 
+func TestUpdateCatchAllRejectsBadDomainID(t *testing.T) {
+	called := false
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		_ = json.NewEncoder(w).Encode(map[string]any{"Code": 1000})
+	}))
+	defer srv.Close()
+
+	id := "a1"
+	for _, bad := range []string{"", "d1/catchall?x=1", "d1#frag", "d1?foo"} {
+		if err := protonraw.UpdateCatchAll(context.Background(), newFakeDoer(srv.URL), bad, &id); err == nil {
+			t.Errorf("UpdateCatchAll(%q) want err, got nil", bad)
+		}
+	}
+	if called {
+		t.Fatal("server hit despite invalid domain_id; guard failed")
+	}
+}
+
+func TestListDomainAddressesRejectsBadDomainID(t *testing.T) {
+	called := false
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+	}))
+	defer srv.Close()
+
+	if _, err := protonraw.ListDomainAddresses(context.Background(), newFakeDoer(srv.URL), ""); err == nil {
+		t.Fatal("empty domain_id must fail")
+	}
+	if _, err := protonraw.ListDomainAddresses(context.Background(), newFakeDoer(srv.URL), "d1/etc"); err == nil {
+		t.Fatal("slash in domain_id must fail")
+	}
+	if called {
+		t.Fatal("server hit despite invalid domain_id; guard failed")
+	}
+}
+
 func TestErrorResponseSurfaced(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]any{

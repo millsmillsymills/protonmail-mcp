@@ -1,6 +1,24 @@
 package protonraw
 
-import "context"
+import (
+	"context"
+	"fmt"
+	"strings"
+)
+
+// validatePathID rejects empty input or any character that would let a
+// caller smuggle path/query bytes into a URL segment we build by string
+// concatenation. Proton IDs are opaque base64-ish strings and never
+// contain these characters in practice.
+func validatePathID(name, id string) error {
+	if id == "" {
+		return fmt.Errorf("%s is required", name)
+	}
+	if strings.ContainsAny(id, "/?#") {
+		return fmt.Errorf("invalid %s %q", name, id)
+	}
+	return nil
+}
 
 // DomainAddress is the per-domain projection of Address; the upstream type is
 // `Omit<Address, 'SignedKeyList' | 'Keys'>` per WebClients/Address.ts. We only
@@ -22,6 +40,9 @@ type DomainAddress struct {
 // ListDomainAddresses -> GET /core/v4/domains/{id}/addresses
 // Source: WebClients/packages/shared/lib/api/domains.ts: queryDomainAddresses
 func ListDomainAddresses(ctx context.Context, d Doer, domainID string) ([]DomainAddress, error) {
+	if err := validatePathID("domain_id", domainID); err != nil {
+		return nil, err
+	}
 	var out struct {
 		Addresses []DomainAddress `json:"Addresses"`
 	}
@@ -42,6 +63,9 @@ func ListDomainAddresses(ctx context.Context, d Doer, domainID string) ([]Domain
 // disable. The Proton API serializes a nil AddressID as JSON null, which is
 // how the web client signals "off".
 func UpdateCatchAll(ctx context.Context, d Doer, domainID string, addressID *string) error {
+	if err := validatePathID("domain_id", domainID); err != nil {
+		return err
+	}
 	body := map[string]any{"AddressID": addressID}
 	resp, err := d.R().SetContext(ctx).SetBody(body).Put("/core/v4/domains/" + domainID + "/catchall")
 	if err != nil {

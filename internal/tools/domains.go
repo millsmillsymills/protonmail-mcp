@@ -117,6 +117,9 @@ func registerDomains(server *mcp.Server, d Deps) {
 		Name:        "proton_get_catchall",
 		Description: "Reports whether catchall is enabled on a custom domain and, if so, which address receives unmatched mail.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in getCatchallIn) (*mcp.CallToolResult, getCatchallOut, error) {
+		if fail := requireField("domain_id", in.DomainID); fail != nil {
+			return fail, getCatchallOut{}, nil
+		}
 		addrs, err := protonraw.ListDomainAddresses(ctx, d.Session.Raw(ctx), in.DomainID)
 		if err != nil {
 			return failure(proterr.Map(err)), getCatchallOut{}, nil
@@ -174,6 +177,12 @@ func registerDomains(server *mcp.Server, d Deps) {
 		Name:        "proton_set_catchall",
 		Description: "Enables catchall on a custom domain and routes unmatched mail to the given address. The address must already exist on that domain.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in setCatchallIn) (*mcp.CallToolResult, setCatchallOut, error) {
+		if fail := requireField("domain_id", in.DomainID); fail != nil {
+			return fail, setCatchallOut{}, nil
+		}
+		if fail := requireField("destination_address_id", in.DestinationAddressID); fail != nil {
+			return fail, setCatchallOut{}, nil
+		}
 		raw := d.Session.Raw(ctx)
 		addrs, err := protonraw.ListDomainAddresses(ctx, raw, in.DomainID)
 		if err != nil {
@@ -203,6 +212,9 @@ func registerDomains(server *mcp.Server, d Deps) {
 		Name:        "proton_disable_catchall",
 		Description: "Disables catchall on a custom domain. Mail to unknown local-parts will bounce.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in disableCatchallIn) (*mcp.CallToolResult, disableCatchallOut, error) {
+		if fail := requireField("domain_id", in.DomainID); fail != nil {
+			return fail, disableCatchallOut{}, nil
+		}
 		if err := protonraw.UpdateCatchAll(ctx, d.Session.Raw(ctx), in.DomainID, nil); err != nil {
 			return failure(proterr.Map(err)), disableCatchallOut{}, nil
 		}
