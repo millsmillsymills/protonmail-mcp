@@ -34,7 +34,11 @@ func (r *rawClient) setAuth(token, uid string) {
 	defer r.mu.Unlock()
 	r.bear = token
 	r.uid = uid
-	if token == "" {
+	// Treat (token != "" && uid == "") as a logout. A half-authenticated
+	// request would 401 on x-pm-uid endpoints anyway, and clearing both
+	// headers prevents a stale UID from leaking onto a request signed with
+	// a fresh token.
+	if token == "" || uid == "" {
 		r.rc.Header.Del("Authorization")
 		r.rc.Header.Del("x-pm-uid")
 		return
