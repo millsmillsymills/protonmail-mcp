@@ -6,9 +6,24 @@ import (
 	"strings"
 
 	proton "github.com/ProtonMail/go-proton-api"
-	"github.com/millsmillsymills/protonmail-mcp/internal/proterr"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/millsmillsymills/protonmail-mcp/internal/proterr"
 )
+
+// sensitiveHeaders are removed from parsed_headers before returning. Bcc
+// reveals recipients hidden by the original sender; X-Originating-IP and
+// related vendor extensions reveal sender network metadata that the
+// standard Received chain already filters at MTA boundaries. Returning
+// these would expose data the recipient never had access to in a
+// conventional mail UI. Raw headers are still returned verbatim — callers
+// asking for raw_headers have explicitly opted into the full block.
+var sensitiveHeaders = map[string]struct{}{
+	"bcc":                    {},
+	"x-originating-ip":       {},
+	"x-original-sender-ip":   {},
+	"x-original-sender":      {},
+	"x-real-ip":              {},
+}
 
 // messageStubDTO is the search-result projection. Fields chosen for the
 // canonical "did delivery happen?" check: subject + sender + recipients +
@@ -87,8 +102,11 @@ func registerMessages(server *mcp.Server, d Deps) {
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "proton_get_message",
-		Description: "Returns a single message's metadata. With include_headers=true, also returns raw RFC822 headers and a parsed map (e.g. Authentication-Results, DKIM-Signature, Received) for delivery verification. Body is not returned — PGP decryption requires an unlocked keyring (v1.5).",
+		Description: "Returns a single message's metadata. With include_headers=true, also returns the raw RFC822 header block and a parsed-header map (e.g. Authentication-Results, DKIM-Signature, Received) for delivery verification. Sensitive headers (Bcc, X-Originating-IP, etc.) are stripped from parsed_headers, but raw_headers is the complete block — treat raw_headers as containing the BCC list and origination IP and handle accordingly. Body is not returned — PGP decryption requires an unlocked keyring (v1.5).",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in getMessageIn) (*mcp.CallToolResult, getMessageOut, error) {
+		if in.ID == "" {
+			return failure(&proterr.Error{Code: "proton/validation", Message: "id is required"}), getMessageOut{}, nil
+		}
 		c, fail := clientOrFail(ctx, d)
 		if fail != nil {
 			return fail, getMessageOut{}, nil
@@ -100,7 +118,7 @@ func registerMessages(server *mcp.Server, d Deps) {
 		out := getMessageOut{Message: toMessageStubDTO(raw.MessageMetadata)}
 		if in.IncludeHeaders {
 			out.RawHeaders = raw.Header
-			out.ParsedHeaders = raw.ParsedHeaders.Values
+			out.ParsedHeaders = filterSensitiveHeaders(raw.ParsedHeaders.Values)
 		}
 		return nil, out, nil
 	})
@@ -138,8 +156,22 @@ func formatAddresses(as []*mail.Address) []string {
 	out := make([]string, 0, len(as))
 	for _, a := range as {
 		if s := formatAddress(a); s != "" {
-			out = append(out, strings.TrimSpace(s))
+			out = append(out, s)
 		}
+	}
+	return out
+}
+
+func filterSensitiveHeaders(in map[string][]string) map[string][]string {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make(map[string][]string, len(in))
+	for k, v := range in {
+		if _, drop := sensitiveHeaders[strings.ToLower(k)]; drop {
+			continue
+		}
+		out[k] = v
 	}
 	return out
 }

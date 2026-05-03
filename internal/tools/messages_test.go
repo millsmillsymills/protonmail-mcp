@@ -38,6 +38,39 @@ func TestFormatAddressesSkipsEmpty(t *testing.T) {
 	}
 }
 
+func TestFilterSensitiveHeadersDropsBccAndIPHeaders(t *testing.T) {
+	in := map[string][]string{
+		"Authentication-Results": {"spf=pass; dkim=pass"},
+		"DKIM-Signature":         {"v=1; a=rsa-sha256; ..."},
+		"Bcc":                    {"hidden@example.com"},
+		"BCC":                    {"another@example.com"},
+		"X-Originating-IP":       {"[203.0.113.5]"},
+		"X-Original-Sender":      {"sender@example.com"},
+		"X-Real-Ip":              {"203.0.113.5"},
+		"Received":               {"from mail.example.com"},
+	}
+	got := filterSensitiveHeaders(in)
+	for _, k := range []string{"Bcc", "BCC", "X-Originating-IP", "X-Original-Sender", "X-Real-Ip"} {
+		if _, ok := got[k]; ok {
+			t.Errorf("header %q must be filtered out, got %v", k, got[k])
+		}
+	}
+	for _, k := range []string{"Authentication-Results", "DKIM-Signature", "Received"} {
+		if _, ok := got[k]; !ok {
+			t.Errorf("header %q must pass through, got: %v", k, got)
+		}
+	}
+}
+
+func TestFilterSensitiveHeadersNilOnEmpty(t *testing.T) {
+	if got := filterSensitiveHeaders(nil); got != nil {
+		t.Fatalf("nil input must return nil, got: %v", got)
+	}
+	if got := filterSensitiveHeaders(map[string][]string{}); got != nil {
+		t.Fatalf("empty input must return nil, got: %v", got)
+	}
+}
+
 func TestToMessageStubDTOPopulatesFields(t *testing.T) {
 	meta := proton.MessageMetadata{
 		ID:             "m1",
