@@ -104,8 +104,8 @@ func registerMessages(server *mcp.Server, d Deps) {
 		Name:        "proton_get_message",
 		Description: "Returns a single message's metadata. With include_headers=true, also returns the raw RFC822 header block and a parsed-header map (e.g. Authentication-Results, DKIM-Signature, Received) for delivery verification. Sensitive headers (Bcc, X-Originating-IP, etc.) are stripped from parsed_headers, but raw_headers is the complete block — treat raw_headers as containing the BCC list and origination IP and handle accordingly. Body is not returned — PGP decryption requires an unlocked keyring (v1.5).",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in getMessageIn) (*mcp.CallToolResult, getMessageOut, error) {
-		if in.ID == "" {
-			return failure(&proterr.Error{Code: "proton/validation", Message: "id is required"}), getMessageOut{}, nil
+		if fail := requireField("id", in.ID); fail != nil {
+			return fail, getMessageOut{}, nil
 		}
 		c, fail := clientOrFail(ctx, d)
 		if fail != nil {

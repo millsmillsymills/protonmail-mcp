@@ -4,7 +4,7 @@ A Model Context Protocol (MCP) server for [Proton Mail](https://proton.me/mail),
 
 ## Status: v1
 
-20 tools total: 11 reads (always registered) + 9 writes (registered when `PROTONMAIL_MCP_ENABLE_WRITES=1`).
+23 tools total: 12 reads (always registered) + 11 writes (registered when `PROTONMAIL_MCP_ENABLE_WRITES=1`).
 
 | Capability | v1 | Notes |
 |---|---|---|
@@ -85,11 +85,11 @@ See `docs/superpowers/specs/2026-04-26-protonmail-mcp-design.md` §5 for the ful
 
 ### Reads (always)
 
-`proton_whoami`, `proton_session_status`, `proton_list_addresses`, `proton_get_address`, `proton_list_custom_domains`, `proton_get_custom_domain`, `proton_get_mail_settings`, `proton_get_core_settings`, `proton_list_address_keys`, `proton_search_messages`, `proton_get_message`.
+`proton_whoami`, `proton_session_status`, `proton_list_addresses`, `proton_get_address`, `proton_list_custom_domains`, `proton_get_custom_domain`, `proton_get_catchall`, `proton_get_mail_settings`, `proton_get_core_settings`, `proton_list_address_keys`, `proton_search_messages`, `proton_get_message`.
 
 ### Writes (gated)
 
-`proton_create_address`, `proton_update_address`, `proton_set_address_status`, `proton_delete_address`, `proton_add_custom_domain`, `proton_verify_custom_domain`, `proton_remove_custom_domain`, `proton_update_mail_settings`, `proton_update_core_settings`.
+`proton_create_address`, `proton_update_address`, `proton_set_address_status`, `proton_delete_address`, `proton_add_custom_domain`, `proton_verify_custom_domain`, `proton_remove_custom_domain`, `proton_set_catchall`, `proton_disable_catchall`, `proton_update_mail_settings`, `proton_update_core_settings`.
 
 ## Security model
 
