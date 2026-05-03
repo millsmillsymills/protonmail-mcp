@@ -14,14 +14,21 @@ import (
 func TestRawSharesBearerToken(t *testing.T) {
 	keyring.MockInit()
 
-	var seen []string
+	type seenReq struct {
+		auth string
+		uid  string
+	}
+	var seen []seenReq
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		seen = append(seen, r.Header.Get("Authorization"))
+		seen = append(seen, seenReq{
+			auth: r.Header.Get("Authorization"),
+			uid:  r.Header.Get("x-pm-uid"),
+		})
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()
 
-	s, err := session.NewForTesting(srv.URL, keychain.Session{UID: "u", AccessToken: "tok-A", RefreshToken: "ref"})
+	s, err := session.NewForTesting(srv.URL, keychain.Session{UID: "u-A", AccessToken: "tok-A", RefreshToken: "ref"})
 	if err != nil {
 		t.Fatalf("NewForTesting: %v", err)
 	}
@@ -31,14 +38,20 @@ func TestRawSharesBearerToken(t *testing.T) {
 		t.Fatalf("first Raw req: %v", err)
 	}
 
-	s.OnAuthRotated(keychain.Session{UID: "u", AccessToken: "tok-B", RefreshToken: "ref2"})
+	s.OnAuthRotated(keychain.Session{UID: "u-B", AccessToken: "tok-B", RefreshToken: "ref2"})
 
 	if _, err := s.Raw(context.Background()).R().Get(srv.URL + "/ping"); err != nil {
 		t.Fatalf("second Raw req: %v", err)
 	}
 
-	if len(seen) != 2 || seen[0] != "Bearer tok-A" || seen[1] != "Bearer tok-B" {
-		t.Fatalf("token rotation not reflected on Raw client: %#v", seen)
+	if len(seen) != 2 {
+		t.Fatalf("expected 2 requests, got %d: %#v", len(seen), seen)
+	}
+	if seen[0].auth != "Bearer tok-A" || seen[0].uid != "u-A" {
+		t.Fatalf("first request headers wrong: %+v", seen[0])
+	}
+	if seen[1].auth != "Bearer tok-B" || seen[1].uid != "u-B" {
+		t.Fatalf("second request headers wrong: %+v", seen[1])
 	}
 }
 
