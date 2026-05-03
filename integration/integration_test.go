@@ -25,6 +25,7 @@ func TestReadToolsRoundTrip(t *testing.T) {
 		{"proton_list_addresses", map[string]any{}},
 		{"proton_get_mail_settings", map[string]any{}},
 		{"proton_get_core_settings", map[string]any{}},
+		{"proton_search_messages", map[string]any{"limit": 10}},
 	}
 	for _, c := range cases {
 		t.Run(c.tool, func(t *testing.T) {
