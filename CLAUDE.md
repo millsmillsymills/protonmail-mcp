@@ -27,4 +27,4 @@ Canonical names used verbatim (`needs-triage`, `needs-info`, `ready-for-agent`, 
 
 ### Domain docs
 
-Single-context layout: `CONTEXT.md` + `docs/adr/` at repo root. See `docs/agents/domain.md`.
+Single-context layout (no per-area split). `CONTEXT.md` and `docs/adr/` are not yet present; the consumer skills proceed silently when absent and `/grill-with-docs` will populate them lazily as terms and decisions get resolved. See `docs/agents/domain.md`.
