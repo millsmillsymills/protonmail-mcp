@@ -14,3 +14,17 @@ uv run consistency-check audit --repo protonmail-mcp
 ## Repo-specific notes
 
 Project layout follows standard Go conventions: `cmd/protonmail-mcp/` for the entrypoint, `internal/` for protocol handlers, raw API client, error mapping, keychain, and session management.
+
+## Agent skills
+
+### Issue tracker
+
+GitHub Issues at `millsmillsymills/protonmail-mcp`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Canonical names used verbatim (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context layout: `CONTEXT.md` + `docs/adr/` at repo root. See `docs/agents/domain.md`.
