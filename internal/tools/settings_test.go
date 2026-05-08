@@ -43,10 +43,19 @@ func TestToCoreSettingsDTO(t *testing.T) {
 }
 
 func TestBoolToSettingsBool(t *testing.T) {
-	if got := boolToSettingsBool(true); got != proton.SettingEnabled {
-		t.Fatalf("true must map to SettingEnabled, got %d", got)
+	tests := []struct {
+		name string
+		in   bool
+		want proton.SettingsBool
+	}{
+		{"true_enabled", true, proton.SettingEnabled},
+		{"false_disabled", false, proton.SettingDisabled},
 	}
-	if got := boolToSettingsBool(false); got != proton.SettingDisabled {
-		t.Fatalf("false must map to SettingDisabled, got %d", got)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := boolToSettingsBool(tc.in); got != tc.want {
+				t.Fatalf("got %d want %d", got, tc.want)
+			}
+		})
 	}
 }

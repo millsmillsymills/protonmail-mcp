@@ -37,17 +37,25 @@ func TestToDomainDTO_FullPopulation(t *testing.T) {
 	}
 }
 
-func TestToDomainDTO_NoRecords(t *testing.T) {
-	got := toDomainDTO(protonraw.CustomDomain{ID: "d2", DomainName: "b.example"})
-	if len(got.Records) != 0 {
-		t.Fatalf("records must be empty, got %v", got.Records)
+func TestToDomainDTO_DefaultStates(t *testing.T) {
+	tests := []struct {
+		name        string
+		in          protonraw.CustomDomain
+		wantRecords int
+	}{
+		{"no_records", protonraw.CustomDomain{ID: "d2", DomainName: "b.example"}, 0},
+		{"all_states_zero", protonraw.CustomDomain{ID: "d3"}, 0},
 	}
-}
-
-func TestToDomainDTO_AllStatesZero(t *testing.T) {
-	got := toDomainDTO(protonraw.CustomDomain{ID: "d3"})
-	if got.State != 0 || got.VerifyState != 0 || got.MxState != 0 ||
-		got.SpfState != 0 || got.DkimState != 0 || got.DmarcState != 0 {
-		t.Fatalf("zero-state mismatch: %+v", got)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := toDomainDTO(tc.in)
+			if len(got.Records) != tc.wantRecords {
+				t.Fatalf("records len: got %d want %d", len(got.Records), tc.wantRecords)
+			}
+			if got.State != 0 || got.VerifyState != 0 || got.MxState != 0 ||
+				got.SpfState != 0 || got.DkimState != 0 || got.DmarcState != 0 {
+				t.Fatalf("zero-state mismatch: %+v", got)
+			}
+		})
 	}
 }

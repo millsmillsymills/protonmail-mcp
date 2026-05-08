@@ -49,20 +49,23 @@ func TestClientOrFail_NilSession(t *testing.T) {
 }
 
 func TestWritesEnabled(t *testing.T) {
-	cases := map[string]bool{
-		"":      false,
-		"0":     false,
-		"false": false,
-		"1":     true,
-		"true":  true,
-		"yes":   true,
-		"YES":   true,
+	tests := []struct {
+		value string
+		want  bool
+	}{
+		{"", false},
+		{"0", false},
+		{"false", false},
+		{"1", true},
+		{"true", true},
+		{"yes", true},
+		{"YES", true},
 	}
-	for v, want := range cases {
-		t.Run(v, func(t *testing.T) {
-			t.Setenv("PROTONMAIL_MCP_ENABLE_WRITES", v)
-			if got := WritesEnabled(); got != want {
-				t.Errorf("v=%q want %v got %v", v, want, got)
+	for _, tc := range tests {
+		t.Run(tc.value, func(t *testing.T) {
+			t.Setenv("PROTONMAIL_MCP_ENABLE_WRITES", tc.value)
+			if got := WritesEnabled(); got != tc.want {
+				t.Errorf("v=%q want %v got %v", tc.value, tc.want, got)
 			}
 		})
 	}
