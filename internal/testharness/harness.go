@@ -125,9 +125,9 @@ func Boot(t *testing.T, email, password string, opts ...Option) *Harness {
 	// resulting primary address is <username>@<domain>, but auth lookups go
 	// through the username only, mirroring proton.local's real-server SRP
 	// behavior.
-	if err := sess.Login(context.Background(), session.LoginInput{Username: local, Password: password}); err != nil {
+	if loginErr := sess.Login(context.Background(), session.LoginInput{Username: local, Password: password}); loginErr != nil {
 		devsrv.Close()
-		t.Fatalf("session.Login: %v", err)
+		t.Fatalf("session.Login: %v", loginErr)
 	}
 
 	mcpSrv := mcp.NewServer(&mcp.Implementation{Name: "protonmail-mcp-test", Version: "0.0.0"}, nil)
