@@ -7,9 +7,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"sync"
 
 	proton "github.com/ProtonMail/go-proton-api"
+	"github.com/go-resty/resty/v2"
 	"github.com/millsmillsymills/protonmail-mcp/internal/keychain"
 )
 
@@ -22,25 +24,52 @@ type Session struct {
 	current keychain.Session
 }
 
-func New(apiURL string, kc *keychain.Keychain) *Session {
-	mgr := proton.New(
+type Option func(*config)
+
+type config struct {
+	transport http.RoundTripper
+}
+
+// nil transport (default) falls back to http.DefaultTransport for both clients.
+func WithTransport(rt http.RoundTripper) Option {
+	return func(c *config) { c.transport = rt }
+}
+
+func New(apiURL string, kc *keychain.Keychain, opts ...Option) *Session {
+	var cfg config
+	for _, o := range opts {
+		o(&cfg)
+	}
+	mgrOpts := []proton.Option{
 		proton.WithHostURL(apiURL),
 		proton.WithAppVersion(appVersionHeader()),
-	)
+	}
+	if cfg.transport != nil {
+		mgrOpts = append(mgrOpts, proton.WithTransport(cfg.transport))
+	}
 	return &Session{
-		mgr: mgr,
+		mgr: proton.New(mgrOpts...),
 		kc:  kc,
-		raw: newRawClient(apiURL),
+		raw: newRawClient(apiURL, cfg.transport),
 	}
 }
 
+// RawClientForTest is the minimal surface tests need from the raw client.
+type RawClientForTest interface {
+	Get(ctx context.Context, path string) (*resty.Response, error)
+}
+
+func (s *Session) RawForTest() RawClientForTest { return s.raw }
+
+func (s *Session) ManagerForTest() *proton.Manager { return s.mgr }
+
 // NewForTesting bypasses keychain load and seeds an existing Session directly.
-func NewForTesting(apiURL string, seed keychain.Session) (*Session, error) {
+func NewForTesting(apiURL string, seed keychain.Session, opts ...Option) (*Session, error) {
 	kc := keychain.New()
 	if err := kc.SaveSession(seed); err != nil {
 		return nil, fmt.Errorf("seed keychain: %w", err)
 	}
-	s := New(apiURL, kc)
+	s := New(apiURL, kc, opts...)
 	s.current = seed
 	s.raw.setAuth(seed.AccessToken, seed.UID)
 	return s, nil
