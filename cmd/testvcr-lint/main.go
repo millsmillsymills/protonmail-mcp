@@ -10,7 +10,13 @@ import (
 func main() {
 	roots := os.Args[1:]
 	if len(roots) == 0 {
-		roots = []string{"testdata/cassettes", "internal/testharness/testdata/cassettes"}
+		roots = []string{
+			"internal/tools/testdata/cassettes",
+			"internal/session/testdata/cassettes",
+			"internal/server/testdata/cassettes",
+			"internal/testharness/testdata/cassettes",
+			"cmd/protonmail-mcp/testdata/cassettes",
+		}
 	}
 	findings := testvcr.Scan(roots...)
 	if len(findings) == 0 {
