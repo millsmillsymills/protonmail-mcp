@@ -56,13 +56,23 @@ only risk is dropping a security-relevant fork patch.
 | `5bc5f01` | Replace ioutil.ReadAll with io.ReadAll | Housekeeping |
 | `56f0d0f` | openpgp: Add support for symmetric subkeys (#74) | Feature (symmetric keys) |
 
-Keyword scan of all 12 subjects + bodies for `security|cve|fix|harden|timing|side-channel|leak|oracle`: **0 hits**.
+Keyword scan of all 12 commit **subjects** for
+`security|cve|fix|harden|timing|side-channel|leak|oracle`: **0 hits**. The
+bodies surface only PQC-internal `fix:` lines from the squashed-commits
+breakdown — those are covered explicitly below.
 
-Within the PQC squash there are two internal correctness commits
-(`[9677cf4] feat: Avoid panic on key size in kmac`,
-`[1bd89db] fix: Kem key combiner should use the kmac correct key`).
-Both are PQC-internal robustness/correctness fixes inside code paths that
-v1.4.1 does not contain at all — there is nothing to regress against.
+Within the PQC squash (commit `14eebf3`) there are three internal
+correctness commits:
+
+- `[9677cf4] feat: Avoid panic on key size in kmac` — panic-prevention in
+  the PQC kmac wrapper.
+- `[1bd89db] fix: Kem key combiner should use the kmac correct key` —
+  correctness fix in the PQC KEM combiner.
+- The squash's own "Fix misc bugs and improve tests" rollup line.
+
+All three are PQC-internal robustness/correctness fixes inside code paths
+that `v1.4.1` does not contain at all — there is nothing to regress against
+when downgrading.
 
 ### File changes
 
@@ -154,7 +164,9 @@ If the decision is **revert**:
 - Pin back to `v1.4.1-proton` in the dependency closure (note: the pin
   has to be done via the modules that depend on `go-crypto`, since this
   repo only references it transitively — adding a `replace` directive in
-  `go.mod` is the standard fix).
+  `go.mod` is the standard fix; `go.mod` already uses one such directive
+  to route `go-resty/resty/v2` to ProtonMail's fork, so the precedent is
+  in place).
 - Document the revert reason in this ADR's Decision section so future
   bumps know not to undo it without re-running the audit.
 
