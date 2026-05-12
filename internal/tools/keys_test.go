@@ -24,7 +24,6 @@ import (
 // fingerprint to catch armoring-format regressions.
 func TestListAddressKeys_HappyPath_GopenpgpRegression(t *testing.T) {
 	h := testharness.Boot(t, "user@example.test", "hunter2")
-	defer h.Close()
 	ctx := context.Background()
 
 	addrsOut, err := h.Call(ctx, "proton_list_addresses", map[string]any{})
@@ -39,7 +38,10 @@ func TestListAddressKeys_HappyPath_GopenpgpRegression(t *testing.T) {
 	if !ok {
 		t.Fatalf("address[0] not an object: %#v", addrs[0])
 	}
-	addrID, _ := first["id"].(string)
+	addrID, ok := first["id"].(string)
+	if !ok {
+		t.Fatalf("address[0].id not a string: %#v", first["id"])
+	}
 	if addrID == "" {
 		t.Fatalf("address[0].id empty: %#v", first)
 	}
@@ -57,10 +59,16 @@ func TestListAddressKeys_HappyPath_GopenpgpRegression(t *testing.T) {
 		t.Fatalf("key[0] not an object: %#v", keys[0])
 	}
 
-	fp, _ := k0["fingerprint"].(string)
-	armored, _ := k0["public_key_armored"].(string)
+	fp, ok := k0["fingerprint"].(string)
+	if !ok {
+		t.Fatalf("fingerprint not a string: %#v", k0["fingerprint"])
+	}
 	if fp == "" {
 		t.Fatalf("fingerprint empty - regression in crypto.NewKey/GetFingerprint")
+	}
+	armored, ok := k0["public_key_armored"].(string)
+	if !ok {
+		t.Fatalf("public_key_armored not a string: %#v", k0["public_key_armored"])
 	}
 	if armored == "" {
 		t.Fatalf("public_key_armored empty - regression in GetArmoredPublicKey")
@@ -72,6 +80,9 @@ func TestListAddressKeys_HappyPath_GopenpgpRegression(t *testing.T) {
 	}
 	if got := pk.GetFingerprint(); got != fp {
 		t.Fatalf("fingerprint round-trip mismatch: armored=%q tool=%q", got, fp)
+	}
+	if pk.IsPrivate() {
+		t.Fatal("public_key_armored contained private key material - regression in GetArmoredPublicKey")
 	}
 }
 
@@ -92,16 +103,21 @@ func TestListAddressKeys_HappyPath_GopenpgpRegression(t *testing.T) {
 // flow. This test instead locks the upstream behaviour the silent-failure
 // path depends on.
 func TestListAddressKeys_SilentFailureContract(t *testing.T) {
-	cases := [][]byte{
-		[]byte("not a pgp key"),
-		nil,
-		[]byte{},
-		{0x00, 0x01, 0x02, 0x03},
+	cases := []struct {
+		name string
+		in   []byte
+	}{
+		{"ascii_garbage", []byte("not a pgp key")},
+		{"nil_slice", nil},
+		{"empty_slice", []byte{}},
+		{"random_bytes", []byte{0x00, 0x01, 0x02, 0x03}},
 	}
-	for _, in := range cases {
-		pk, err := crypto.NewKey(in)
-		if err == nil && pk != nil {
-			t.Fatalf("crypto.NewKey(%q): want error or nil key, got pk=%v", in, pk)
-		}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			pk, err := crypto.NewKey(tc.in)
+			if err == nil && pk != nil {
+				t.Fatalf("crypto.NewKey(%x): want error or nil key, got pk=%v", tc.in, pk)
+			}
+		})
 	}
 }
