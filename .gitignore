@@ -21,3 +21,8 @@ coverage.txt
 # Worktrees
 .worktrees/
 *.fuzz-corpus.local/
+
+# Recording
+.env.record
+cov.out
+cov.html
