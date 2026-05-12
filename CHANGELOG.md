@@ -10,8 +10,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Cross-link to canonical MCP standards (`consistency-check/docs/standards/`).
 - `CONTRIBUTING.md` (#33).
 - `.golangci.yml` config with a full clear of new findings (GO-004) (#34).
-- Table-driven, property-based, and fuzz test expansions (GO-006) (#40, #43, #45).
-- `internal/testharness` fixture + HTTP interceptor helpers (#43).
+- Table-driven test conversion across four suites (GO-006) (#40).
+- Fuzz targets plus `internal/testharness` fixture and HTTP interceptor
+  helpers (#43).
+- Property-based test-plan/v1 unit coverage (#45).
 - gopenpgp regression test for `proton_list_address_keys` after the
   `v2.10.0-proton` -> `v2.10.0` swap (#50).
 - CI: `gofmt` enforcement step (GO-005) (#36).
@@ -20,7 +22,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 - Go toolchain directive bumped 1.26.2 -> 1.26.3 (#41).
-- Dependency bump: `github.com/modelcontextprotocol/go-sdk` (#47).
+- Dependency bump: `github.com/modelcontextprotocol/go-sdk` 1.5.0 -> 1.6.0
+  (#47).
 - `cmd/`: documented the bare-goroutine vs `errgroup` choice (GO-013) (#39).
 - GitHub URLs across docs updated after `millsmillsymills` -> `millsymills-com`
   org rename (#54).
