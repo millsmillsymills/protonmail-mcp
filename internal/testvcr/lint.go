@@ -46,7 +46,7 @@ func Scan(roots ...string) []Finding {
 				out = append(out, Finding{Path: path, Rule: "read-error", Hit: err.Error()})
 				return nil
 			}
-			defer f.Close()
+			defer func() { _ = f.Close() }()
 			s := bufio.NewScanner(f)
 			s.Buffer(make([]byte, 1<<16), 1<<22)
 			line := 0

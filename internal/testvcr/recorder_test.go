@@ -35,3 +35,26 @@ func TestCassettePathResolvesUnderCallerTestdata(t *testing.T) {
 		t.Fatal("expected non-nil transport")
 	}
 }
+
+// TestCassettePathSkipsTestvcrAndTestharnessFrames exercises the stack-walking
+// resolver without VCR_TESTDATA_OVERRIDE. The caller of testvcr.New is this
+// _test.go file in internal/testvcr/, which stays eligible despite being in
+// the testvcr package because the resolver only skips non-test sources.
+func TestCassettePathSkipsTestvcrAndTestharnessFrames(t *testing.T) {
+	t.Setenv("VCR_MODE", "replay")
+	dir := filepath.Join("testdata", "cassettes")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "walk_smoke.yaml")
+	yaml := "version: 2\ninteractions: []\n"
+	if err := os.WriteFile(path, []byte(yaml), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Remove(path) })
+
+	rt := testvcr.New(t, "walk_smoke")
+	if rt == nil {
+		t.Fatal("expected non-nil transport")
+	}
+}

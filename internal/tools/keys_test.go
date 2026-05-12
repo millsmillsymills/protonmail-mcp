@@ -23,7 +23,7 @@ import (
 // armored output round-trips through crypto.NewKeyFromArmored to the same
 // fingerprint to catch armoring-format regressions.
 func TestListAddressKeys_HappyPath_GopenpgpRegression(t *testing.T) {
-	h := testharness.Boot(t, "user@example.test", "hunter2")
+	h := testharness.BootDevServer(t, "user@example.test", "hunter2")
 	ctx := context.Background()
 
 	addrsOut, err := h.Call(ctx, "proton_list_addresses", map[string]any{})

@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"gopkg.in/dnaeon/go-vcr.v4/pkg/recorder"
@@ -65,11 +66,23 @@ func resolvePath(t *testing.T, name string) string {
 	if override := os.Getenv("VCR_TESTDATA_OVERRIDE"); override != "" {
 		return filepath.Join(override, name)
 	}
-	_, file, _, ok := runtime.Caller(2) // Caller 0=resolvePath, 1=New, 2=test fn
-	if !ok {
-		t.Fatal("testvcr: cannot resolve caller for cassette path")
+	// Walk the stack and pick the first frame outside testvcr/testharness
+	// source files. _test.go files in those packages stay eligible so their
+	// own cassette tests resolve under their package's testdata/.
+	for i := 1; i < 16; i++ {
+		_, file, _, ok := runtime.Caller(i)
+		if !ok {
+			break
+		}
+		if !strings.HasSuffix(file, "_test.go") &&
+			(strings.Contains(file, "/internal/testvcr/") ||
+				strings.Contains(file, "/internal/testharness/")) {
+			continue
+		}
+		return filepath.Join(filepath.Dir(file), "testdata", "cassettes", name)
 	}
-	return filepath.Join(filepath.Dir(file), "testdata", "cassettes", name)
+	t.Fatal("testvcr: no caller frame outside testvcr/testharness")
+	return ""
 }
 
 func guardRecordInCI() error {

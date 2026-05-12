@@ -8,7 +8,7 @@ import (
 )
 
 func TestWhoamiRoundTrip(t *testing.T) {
-	h := testharness.Boot(t, "user@example.test", "hunter2")
+	h := testharness.BootDevServer(t, "user@example.test", "hunter2")
 	defer h.Close()
 
 	out, err := h.Call(context.Background(), "proton_whoami", map[string]any{})
