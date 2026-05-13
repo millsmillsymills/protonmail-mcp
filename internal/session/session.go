@@ -13,6 +13,7 @@ import (
 	proton "github.com/ProtonMail/go-proton-api"
 	"github.com/go-resty/resty/v2"
 	"github.com/millsmillsymills/protonmail-mcp/internal/keychain"
+	"github.com/millsmillsymills/protonmail-mcp/internal/proterr"
 )
 
 type Session struct {
@@ -91,7 +92,7 @@ func (s *Session) Client(ctx context.Context) (*proton.Client, error) {
 	}
 	sess, err := s.kc.LoadSession()
 	if err != nil {
-		return nil, errors.New("no session in keychain — run `protonmail-mcp login`")
+		return nil, fmt.Errorf("%w — run `protonmail-mcp login`", proterr.ErrNoSession)
 	}
 	c, refreshed, err := s.mgr.NewClientWithRefresh(ctx, sess.UID, sess.RefreshToken)
 	if err != nil {

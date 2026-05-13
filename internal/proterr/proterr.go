@@ -92,6 +92,15 @@ func errToMCP(err error) *Error {
 		}
 	}
 
+	// Keychain miss: no stored session — user must log in first.
+	if errors.Is(err, ErrNoSession) {
+		return &Error{
+			Code:    "proton/auth_required",
+			Message: "No session — run `protonmail-mcp login`.",
+			Hint:    "Run `protonmail-mcp login` interactively, then retry.",
+		}
+	}
+
 	// Anything else is treated as upstream/transport.
 	return &Error{
 		Code:    "proton/upstream",
