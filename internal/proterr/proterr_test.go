@@ -108,6 +108,17 @@ func TestHVErrorIncludesToken(t *testing.T) {
 	}
 }
 
+func TestHTTPErrorString(t *testing.T) {
+	withBody := &proterr.HTTPError{Status: http.StatusBadGateway, Body: "service down"}
+	if got := withBody.Error(); got != "Bad Gateway: service down" {
+		t.Fatalf("unexpected: %q", got)
+	}
+	noBody := &proterr.HTTPError{Status: http.StatusBadGateway}
+	if got := noBody.Error(); got != "Bad Gateway" {
+		t.Fatalf("unexpected: %q", got)
+	}
+}
+
 func TestWritesDisabled(t *testing.T) {
 	got := proterr.WritesDisabled()
 	if got == nil || got.Code != "proton/writes_disabled" {
