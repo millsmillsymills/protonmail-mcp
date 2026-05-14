@@ -156,6 +156,8 @@ func mapStatus(status int, headers http.Header) *Error {
 			Code:    "proton/plan_required",
 			Message: "This feature is not available on your Proton plan.",
 		}
+	case http.StatusForbidden:
+		return &Error{Code: "proton/permission_denied", Message: "Permission denied."}
 	case http.StatusNotFound:
 		return &Error{Code: "proton/not_found", Message: "Resource not found."}
 	case http.StatusConflict:

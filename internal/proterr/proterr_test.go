@@ -21,6 +21,7 @@ func TestMap(t *testing.T) {
 		{"nil", nil, ""},
 		{"401", &proton.APIError{Status: http.StatusUnauthorized}, "proton/auth_required"},
 		{"402", &proton.APIError{Status: http.StatusPaymentRequired}, "proton/plan_required"},
+		{"403", &proton.APIError{Status: http.StatusForbidden}, "proton/permission_denied"},
 		{"404", &proton.APIError{Status: http.StatusNotFound}, "proton/not_found"},
 		{"409", &proton.APIError{Status: http.StatusConflict}, "proton/conflict"},
 		{"422", &proton.APIError{Status: http.StatusUnprocessableEntity}, "proton/validation"},
