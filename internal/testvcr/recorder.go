@@ -13,6 +13,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/millsmillsymills/protonmail-mcp/internal/version"
 	"gopkg.in/dnaeon/go-vcr.v4/pkg/recorder"
 )
 
@@ -84,8 +85,8 @@ func New(t *testing.T, name string) http.RoundTripper {
 //
 // Returns the underlying RoundTripper and a stop function that flushes the
 // cassette and writes the metadata sidecar (in record mode). The caller is
-// responsible for calling stop().
-func NewAtPath(path string, mode RecorderMode) (http.RoundTripper, func(), error) {
+// responsible for calling stop() and checking its error.
+func NewAtPath(path string, mode RecorderMode) (http.RoundTripper, func() error, error) {
 	if err := guardRecordInCI(); err != nil {
 		return nil, nil, err
 	}
@@ -101,13 +102,16 @@ func NewAtPath(path string, mode RecorderMode) (http.RoundTripper, func(), error
 	if err != nil {
 		return nil, nil, err
 	}
-	stop := func() {
+	stop := func() error {
 		if err := r.Stop(); err != nil {
-			return
+			return fmt.Errorf("vcr stop: %w", err)
 		}
 		if mode == ModeRecord {
-			_ = writeMeta(path+".yaml", filepath.Base(path))
+			if err := writeMeta(path+".yaml", filepath.Base(path)); err != nil {
+				return fmt.Errorf("vcr write meta: %w", err)
+			}
 		}
+		return nil
 	}
 	return r.GetDefaultClient().Transport, stop, nil
 }
@@ -139,9 +143,10 @@ func resolvePath(t *testing.T, name string) string {
 // writeMeta stamps a sidecar <cassettePath>.meta.yaml alongside the YAML file.
 func writeMeta(cassettePath, scenario string) error {
 	meta := fmt.Sprintf(
-		"recorded_at: %s\ngo_proton_api_version: %s\nmcp_version: v0.1.0\nscenario: %s\n",
+		"recorded_at: %s\ngo_proton_api_version: %s\nmcp_version: %s\nscenario: %s\n",
 		nowFunc().UTC().Format("2006-01-02T15:04:05Z"),
 		goProtonAPIVersion(),
+		version.MCP,
 		scenario,
 	)
 	return os.WriteFile(cassettePath+".meta.yaml", []byte(meta), 0o644)

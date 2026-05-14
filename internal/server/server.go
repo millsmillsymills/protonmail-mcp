@@ -12,13 +12,13 @@ import (
 	"github.com/millsmillsymills/protonmail-mcp/internal/keychain"
 	"github.com/millsmillsymills/protonmail-mcp/internal/session"
 	"github.com/millsmillsymills/protonmail-mcp/internal/tools"
+	"github.com/millsmillsymills/protonmail-mcp/internal/version"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 const (
 	defaultAPIURL = "https://mail.proton.me/api"
 	serverName    = "protonmail-mcp"
-	serverVersion = "v0.1.0"
 )
 
 // RegisterAll attaches every v1 tool to srv against sess. Exposed so tests
@@ -43,7 +43,7 @@ func RunWithOptions(ctx context.Context, apiURL string, transport http.RoundTrip
 		apiURL = v
 	}
 	sess := session.New(apiURL, keychain.New(), session.WithTransport(transport))
-	srv := mcp.NewServer(&mcp.Implementation{Name: serverName, Version: serverVersion}, nil)
+	srv := mcp.NewServer(&mcp.Implementation{Name: serverName, Version: version.MCP}, nil)
 	tools.Register(srv, tools.Deps{Session: sess})
 	if err := srv.Run(ctx, &mcp.StdioTransport{}); err != nil {
 		return fmt.Errorf("mcp server: %w", err)

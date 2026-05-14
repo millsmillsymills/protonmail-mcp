@@ -90,3 +90,19 @@ func TestScrubRewritesDomain(t *testing.T) {
 		t.Fatalf("domain not rewritten: %s", got)
 	}
 }
+
+func TestScrubRewritesThrowawayDomain(t *testing.T) {
+	t.Setenv("RECORD_THROWAWAY_DOMAIN", "throwaway.dev")
+	body := `{"DomainName":"throwaway.dev","Status":"active"}`
+	ct := http.Header{"Content-Type": []string{"application/json"}}
+	i := &cassette.Interaction{
+		Response: cassette.Response{Body: body, Headers: ct},
+	}
+	if err := saveHook(i); err != nil {
+		t.Fatal(err)
+	}
+	want := `{"DomainName":"throwaway.example.test","Status":"active"}`
+	if got := i.Response.Body; got != want {
+		t.Fatalf("throwaway domain not rewritten: got %s, want %s", got, want)
+	}
+}

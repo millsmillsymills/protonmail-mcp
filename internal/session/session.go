@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"sync"
 
@@ -124,9 +125,7 @@ func (s *Session) Client(ctx context.Context) (*proton.Client, error) {
 	s.current = rotated
 	s.raw.setAuth(rotated.AccessToken, rotated.UID)
 	if err := s.kc.SaveSession(rotated); err != nil {
-		// Best-effort: log only. In-memory state is correct; next cold start
-		// will re-login if the persisted state is stale.
-		_ = err
+		slog.Warn("session: persist rotated tokens failed", "err", err)
 	}
 	return c, nil
 }
@@ -152,7 +151,7 @@ func (s *Session) OnAuthRotated(next keychain.Session) {
 	s.raw.setAuth(next.AccessToken, next.UID)
 	s.mu.Unlock()
 	if err := s.kc.SaveSession(next); err != nil {
-		_ = err // best-effort
+		slog.Warn("session: persist rotated tokens failed", "err", err)
 	}
 }
 

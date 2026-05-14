@@ -22,4 +22,4 @@ record:
 ifndef SCENARIO
 	$(error SCENARIO is required, e.g. make record SCENARIO=whoami_happy)
 endif
-	$(GO) run -tags recording ./cmd/record-cassettes $(SCENARIO)
+	$(GO) run -tags recording ./cmd/record-cassettes '$(SCENARIO)'

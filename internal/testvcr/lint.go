@@ -28,8 +28,15 @@ type lintRule struct {
 
 var lintRules = []lintRule{
 	{"bearer-token", regexp.MustCompile(`Bearer [A-Za-z0-9._\-]{20,}`)},
-	{"access-token-raw", regexp.MustCompile(`"AccessToken":\s*"[^R]`)},
-	{"refresh-token-raw", regexp.MustCompile(`"RefreshToken":\s*"[^R]`)},
+	{"access-token-raw", regexp.MustCompile(`"AccessToken":\s*"[^R][^"]+"`)},
+	{"refresh-token-raw", regexp.MustCompile(`"RefreshToken":\s*"[^R][^"]+"`)},
+	{"uid-raw", regexp.MustCompile(`"UID":\s*"[^R][^"]+"`)},
+	{"key-salt-raw", regexp.MustCompile(`"KeySalt":\s*"[^R][^"]+"`)},
+	{"srp-session-raw", regexp.MustCompile(`"SrpSession":\s*"[^R][^"]+"`)},
+	{"server-proof-raw", regexp.MustCompile(`"ServerProof":\s*"[^R][^"]+"`)},
+	{"client-proof-raw", regexp.MustCompile(`"ClientProof":\s*"[^R][^"]+"`)},
+	{"client-ephemeral-raw", regexp.MustCompile(`"ClientEphemeral":\s*"[^R][^"]+"`)},
+	{"two-factor-code-raw", regexp.MustCompile(`"TwoFactorCode":\s*"[^R][^"]+"`)},
 	{"pgp-private", regexp.MustCompile(`BEGIN PGP PRIVATE KEY BLOCK`)},
 	{"pgp-message", regexp.MustCompile(`BEGIN PGP MESSAGE`)},
 	{"proton-email", regexp.MustCompile(`@protonmail\.|@proton\.me`)},

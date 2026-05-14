@@ -15,11 +15,13 @@ var softRules = map[string]bool{
 func main() {
 	roots := os.Args[1:]
 	if len(roots) == 0 {
+		// Keep this list in sync when adding new cassette directories.
 		roots = []string{
 			"internal/tools/testdata/cassettes",
 			"internal/session/testdata/cassettes",
 			"internal/server/testdata/cassettes",
 			"internal/testharness/testdata/cassettes",
+			"internal/testvcr/testdata/cassettes",
 			"cmd/protonmail-mcp/testdata/cassettes",
 		}
 	}

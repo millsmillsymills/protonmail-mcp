@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-profile="${1:-cov.out}"
-
 AGGREGATE_MIN=90.0
 PER_PKG_MIN=75.0
 
@@ -17,32 +15,39 @@ INCLUDED=(
   "github.com/millsmillsymills/protonmail-mcp/internal/keychain"
 )
 
-go tool cover -func="$profile" >"$profile.func"
-
-pkg_pct() {
-  local pkg="$1"
-  awk -v p="$pkg" '
-    $1 ~ p {
-      split($NF, a, "%");
-      total++;
-      sum += a[1];
-    }
-    END {
-      if (total == 0) print "0.0"; else printf("%.1f", sum/total);
-    }
-  ' "$profile.func"
-}
-
-aggregate_line=$(awk '/^total:/ {print $NF}' "$profile.func" | tr -d '%')
-echo "aggregate: ${aggregate_line}%"
-
+profile="${1:-cov.out}"
 fail=0
+
+# Aggregate from go tool cover -func total: line.
+aggregate=$(go tool cover -func="$profile" | awk '/^total:/ { gsub("%", "", $NF); print $NF }')
+echo "aggregate: ${aggregate}%"
+
+# Per-package: parse the coverprofile directly. Each non-mode line is:
+#   <file>:<startLine>.<startCol>,<endLine>.<endCol> <numStmts> <count>
+# A statement is covered when count > 0.
 for pkg in "${INCLUDED[@]}"; do
-  pct=$(pkg_pct "$pkg")
-  printf "  %-70s %s%%\n" "$pkg" "$pct"
-  awk -v a="$pct" -v b="$PER_PKG_MIN" 'BEGIN{ exit (a+0 < b+0) ? 1 : 0 }' || { echo "FAIL: $pkg below ${PER_PKG_MIN}% floor"; fail=1; }
+    pct=$(awk -v p="$pkg/" '
+        NR == 1 { next }
+        $1 ~ p {
+            stmts = $2
+            count = $3
+            total += stmts
+            if (count + 0 > 0) covered += stmts
+        }
+        END {
+            if (total == 0) print "0.0"; else printf("%.1f", (covered / total) * 100)
+        }
+    ' "$profile")
+    printf "  %-70s %s%%\n" "$pkg" "$pct"
+    awk -v a="$pct" -v b="$PER_PKG_MIN" 'BEGIN{ exit (a+0 < b+0) ? 1 : 0 }' || {
+        echo "FAIL: $pkg below ${PER_PKG_MIN}% floor"
+        fail=1
+    }
 done
 
-awk -v a="$aggregate_line" -v b="$AGGREGATE_MIN" 'BEGIN{ exit (a+0 < b+0) ? 1 : 0 }' || { echo "FAIL: aggregate below ${AGGREGATE_MIN}%"; fail=1; }
+awk -v a="$aggregate" -v b="$AGGREGATE_MIN" 'BEGIN{ exit (a+0 < b+0) ? 1 : 0 }' || {
+    echo "FAIL: aggregate below ${AGGREGATE_MIN}%"
+    fail=1
+}
 
 exit "$fail"

@@ -4,7 +4,6 @@ package scenarios
 
 import (
 	"context"
-	"net/http"
 	"os"
 	"path/filepath"
 
@@ -17,7 +16,7 @@ func init() {
 	Register("token_rotation", recordTokenRotation)
 }
 
-func recordTokenRotation(ctx context.Context) error {
+func recordTokenRotation(ctx context.Context) (retErr error) {
 	target := filepath.Join("internal", "session", "testdata", "cassettes", "token_rotation")
 	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 		return err
@@ -26,7 +25,11 @@ func recordTokenRotation(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	defer stop()
+	defer func() {
+		if err := stop(); err != nil && retErr == nil {
+			retErr = err
+		}
+	}()
 
 	kc := keychain.New()
 	plainSess, err := loginAndPersistSession(ctx, kc)
@@ -38,7 +41,7 @@ func recordTokenRotation(ctx context.Context) error {
 	// Inject a one-shot 401 on /core/v4/users so the session refresh-on-401
 	// path fires, then the retry and refresh exchange are captured by the cassette.
 	wrapped := inject401AccessTokenExpired(rt, "/core/v4/users")
-	sess := session.New(defaultAPIURL(), kc, session.WithTransport(http.RoundTripper(wrapped)))
+	sess := session.New(defaultAPIURL(), kc, session.WithTransport(wrapped))
 	c, err := sess.Client(ctx)
 	if err != nil {
 		return err

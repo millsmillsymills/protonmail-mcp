@@ -30,7 +30,7 @@ func init() {
 	Register("error_upstream_503", recordErrorUpstream503)
 }
 
-func openErrorCassette(scenario string) (http.RoundTripper, func(), error) {
+func openErrorCassette(scenario string) (http.RoundTripper, func() error, error) {
 	target := filepath.Join(toolsCassetteDir, scenario)
 	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 		return nil, nil, err
@@ -47,12 +47,16 @@ func recordInjectedError(
 	scenario string,
 	inject func(rt http.RoundTripper) http.RoundTripper,
 	fn func(c *proton.Client) error,
-) error {
+) (retErr error) {
 	rt, stop, err := openErrorCassette(scenario)
 	if err != nil {
 		return err
 	}
-	defer stop()
+	defer func() {
+		if err := stop(); err != nil && retErr == nil {
+			retErr = err
+		}
+	}()
 
 	kc := keychain.New()
 	plainSess, err := loginAndPersistSession(ctx, kc)
@@ -62,7 +66,7 @@ func recordInjectedError(
 	defer logoutAndClear(plainSess, kc)
 
 	wrapped := inject(rt)
-	sess := session.New(defaultAPIURL(), kc, session.WithTransport(http.RoundTripper(wrapped)))
+	sess := session.New(defaultAPIURL(), kc, session.WithTransport(wrapped))
 	c, err := sess.Client(ctx)
 	if err != nil {
 		return err

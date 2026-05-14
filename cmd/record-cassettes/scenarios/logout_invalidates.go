@@ -16,7 +16,7 @@ func init() {
 	Register("logout_invalidates", recordLogoutInvalidates)
 }
 
-func recordLogoutInvalidates(ctx context.Context) error {
+func recordLogoutInvalidates(ctx context.Context) (retErr error) {
 	target := filepath.Join("internal", "session", "testdata", "cassettes", "logout_invalidates")
 	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 		return err
@@ -25,7 +25,11 @@ func recordLogoutInvalidates(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	defer stop()
+	defer func() {
+		if err := stop(); err != nil && retErr == nil {
+			retErr = err
+		}
+	}()
 
 	kc := keychain.New()
 	in := session.LoginInput{

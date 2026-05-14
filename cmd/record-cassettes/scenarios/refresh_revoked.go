@@ -4,7 +4,6 @@ package scenarios
 
 import (
 	"context"
-	"net/http"
 	"os"
 	"path/filepath"
 
@@ -17,7 +16,7 @@ func init() {
 	Register("refresh_revoked", recordRefreshRevoked)
 }
 
-func recordRefreshRevoked(ctx context.Context) error {
+func recordRefreshRevoked(ctx context.Context) (retErr error) {
 	target := filepath.Join("internal", "session", "testdata", "cassettes", "refresh_revoked")
 	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 		return err
@@ -26,7 +25,11 @@ func recordRefreshRevoked(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	defer stop()
+	defer func() {
+		if err := stop(); err != nil && retErr == nil {
+			retErr = err
+		}
+	}()
 
 	kc := keychain.New()
 	plainSess, err := loginAndPersistSession(ctx, kc)
@@ -39,7 +42,7 @@ func recordRefreshRevoked(ctx context.Context) error {
 	// which then hits the 422 on /auth/refresh before falling through to rt.
 	wrapped := inject401AccessTokenExpired(rt, "/core/v4/users")
 	wrapped = inject422RefreshRevoked(wrapped, "/auth/refresh")
-	sess := session.New(defaultAPIURL(), kc, session.WithTransport(http.RoundTripper(wrapped)))
+	sess := session.New(defaultAPIURL(), kc, session.WithTransport(wrapped))
 	c, err := sess.Client(ctx)
 	if err != nil {
 		return err

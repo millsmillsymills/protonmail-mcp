@@ -27,7 +27,7 @@ func recordReadTool(
 	ctx context.Context,
 	scenario, cassetteDir string,
 	fn func(c *proton.Client) error,
-) error {
+) (retErr error) {
 	target := filepath.Join(cassetteDir, scenario)
 	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 		return err
@@ -36,7 +36,11 @@ func recordReadTool(
 	if err != nil {
 		return fmt.Errorf("open recorder: %w", err)
 	}
-	defer stop()
+	defer func() {
+		if err := stop(); err != nil && retErr == nil {
+			retErr = err
+		}
+	}()
 
 	kc := keychain.New()
 	plainSess, loginErr := loginAndPersistSession(ctx, kc)
@@ -62,7 +66,7 @@ func recordRawTool(
 	ctx context.Context,
 	scenario, cassetteDir string,
 	fn func(ctx context.Context, s *session.Session) error,
-) error {
+) (retErr error) {
 	target := filepath.Join(cassetteDir, scenario)
 	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 		return err
@@ -71,7 +75,11 @@ func recordRawTool(
 	if err != nil {
 		return fmt.Errorf("open recorder: %w", err)
 	}
-	defer stop()
+	defer func() {
+		if err := stop(); err != nil && retErr == nil {
+			retErr = err
+		}
+	}()
 
 	kc := keychain.New()
 	plainSess, loginErr := loginAndPersistSession(ctx, kc)

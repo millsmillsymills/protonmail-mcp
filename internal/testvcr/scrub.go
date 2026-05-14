@@ -50,16 +50,18 @@ func saveHook(i *cassette.Interaction) error {
 }
 
 type bodyScrubber struct {
-	counters map[string]int
-	email    string
-	domain   string
+	counters        map[string]int
+	email           string
+	domain          string
+	throwawayDomain string
 }
 
 func newBodyScrubber() *bodyScrubber {
 	return &bodyScrubber{
-		counters: map[string]int{},
-		email:    strings.TrimSpace(os.Getenv("RECORD_EMAIL")),
-		domain:   strings.TrimSpace(os.Getenv("RECORD_DOMAIN")),
+		counters:        map[string]int{},
+		email:           strings.TrimSpace(os.Getenv("RECORD_EMAIL")),
+		domain:          strings.TrimSpace(os.Getenv("RECORD_DOMAIN")),
+		throwawayDomain: strings.TrimSpace(os.Getenv("RECORD_THROWAWAY_DOMAIN")),
 	}
 }
 
@@ -112,6 +114,9 @@ func (s *bodyScrubber) rewriteIdentifiers(in string) string {
 	out := in
 	if s.email != "" {
 		out = strings.ReplaceAll(out, s.email, "user@example.test")
+	}
+	if s.throwawayDomain != "" {
+		out = strings.ReplaceAll(out, s.throwawayDomain, "throwaway.example.test")
 	}
 	if s.domain != "" {
 		out = strings.ReplaceAll(out, s.domain, "example.test")

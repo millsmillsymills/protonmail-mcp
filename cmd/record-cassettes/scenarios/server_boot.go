@@ -17,7 +17,7 @@ func init() {
 	Register("boot_dispatch", recordBootDispatch)
 }
 
-func recordBootDispatch(ctx context.Context) error {
+func recordBootDispatch(ctx context.Context) (retErr error) {
 	target := filepath.Join("internal", "server", "testdata", "cassettes", "boot_dispatch")
 	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 		return err
@@ -26,7 +26,11 @@ func recordBootDispatch(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	defer stop()
+	defer func() {
+		if err := stop(); err != nil && retErr == nil {
+			retErr = err
+		}
+	}()
 
 	kc := keychain.New()
 	plainSess, loginErr := loginAndPersistSession(ctx, kc)

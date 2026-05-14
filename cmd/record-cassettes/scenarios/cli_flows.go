@@ -25,7 +25,7 @@ func init() {
 	})
 }
 
-func recordStatusLoggedIn(ctx context.Context) error {
+func recordStatusLoggedIn(ctx context.Context) (retErr error) {
 	target := filepath.Join(cliCassetteDir, "status_logged_in")
 	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 		return err
@@ -34,7 +34,11 @@ func recordStatusLoggedIn(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	defer stop()
+	defer func() {
+		if err := stop(); err != nil && retErr == nil {
+			retErr = err
+		}
+	}()
 
 	kc := keychain.New()
 	plainSess, loginErr := loginAndPersistSession(ctx, kc)
@@ -52,7 +56,7 @@ func recordStatusLoggedIn(ctx context.Context) error {
 	return err
 }
 
-func recordLogin(ctx context.Context, scenario, cassetteDir string, twoFA bool) error {
+func recordLogin(ctx context.Context, scenario, cassetteDir string, twoFA bool) (retErr error) {
 	target := filepath.Join(cassetteDir, scenario)
 	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 		return err
@@ -61,7 +65,11 @@ func recordLogin(ctx context.Context, scenario, cassetteDir string, twoFA bool) 
 	if err != nil {
 		return err
 	}
-	defer stop()
+	defer func() {
+		if err := stop(); err != nil && retErr == nil {
+			retErr = err
+		}
+	}()
 
 	email := os.Getenv("RECORD_EMAIL")
 	password := os.Getenv("RECORD_PASSWORD")

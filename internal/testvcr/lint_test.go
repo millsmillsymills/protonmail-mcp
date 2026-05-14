@@ -74,6 +74,69 @@ func TestLintAllowsScrubbedAccessToken(t *testing.T) {
 	}
 }
 
+func TestLintNewRulesFireOnRaw(t *testing.T) {
+	cases := []struct {
+		rule string
+		body string
+	}{
+		{"uid-raw", `"UID": "abc123xyz"`},
+		{"key-salt-raw", `"KeySalt": "somesaltvalue"`},
+		{"srp-session-raw", `"SrpSession": "srpdata123"`},
+		{"server-proof-raw", `"ServerProof": "proofvalue1"`},
+		{"client-proof-raw", `"ClientProof": "proofvalue2"`},
+		{"client-ephemeral-raw", `"ClientEphemeral": "ephemdata1"`},
+		{"two-factor-code-raw", `"TwoFactorCode": "123456789"`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.rule, func(t *testing.T) {
+			dir := t.TempDir()
+			if err := os.WriteFile(filepath.Join(dir, "leaky.yaml"), []byte(tc.body), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			got := testvcr.Scan(dir)
+			found := false
+			for _, f := range got {
+				if f.Rule == tc.rule {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Fatalf("expected %q finding; got %+v", tc.rule, got)
+			}
+		})
+	}
+}
+
+func TestLintNewRulesIgnoreScrubbed(t *testing.T) {
+	cases := []struct {
+		rule string
+		body string
+	}{
+		{"uid-raw", `"UID": "REDACTED_UID_1"`},
+		{"key-salt-raw", `"KeySalt": "REDACTED_KEYSALT_1"`},
+		{"srp-session-raw", `"SrpSession": "REDACTED_SRPSESSION_1"`},
+		{"server-proof-raw", `"ServerProof": "REDACTED_SERVERPROOF_1"`},
+		{"client-proof-raw", `"ClientProof": "REDACTED_CLIENTPROOF_1"`},
+		{"client-ephemeral-raw", `"ClientEphemeral": "REDACTED_CLIENTEPHEMERAL_1"`},
+		{"two-factor-code-raw", `"TwoFactorCode": "REDACTED_TWOFACTORCODE_1"`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.rule, func(t *testing.T) {
+			dir := t.TempDir()
+			if err := os.WriteFile(filepath.Join(dir, "ok.yaml"), []byte(tc.body), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			got := testvcr.Scan(dir)
+			for _, f := range got {
+				if f.Rule == tc.rule {
+					t.Fatalf("rule %q fired on scrubbed value; finding: %+v", tc.rule, f)
+				}
+			}
+		})
+	}
+}
+
 func TestLintReportsReadError(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("chmod 000 unreliable on windows")
