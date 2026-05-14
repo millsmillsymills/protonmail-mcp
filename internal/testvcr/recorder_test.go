@@ -36,6 +36,26 @@ func TestCassettePathResolvesUnderCallerTestdata(t *testing.T) {
 	}
 }
 
+func TestNewSkipsWhenCassetteMissing(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("VCR_TESTDATA_OVERRIDE", dir)
+	t.Setenv("VCR_MODE", "replay")
+
+	var ran bool
+	var skipped bool
+	t.Run("missing", func(sub *testing.T) {
+		defer func() { skipped = sub.Skipped() }()
+		_ = testvcr.New(sub, "does_not_exist")
+		ran = true
+	})
+	if ran {
+		t.Fatal("expected New to skip before returning")
+	}
+	if !skipped {
+		t.Fatal("expected subtest to be marked skipped")
+	}
+}
+
 // TestCassettePathSkipsTestvcrAndTestharnessFrames exercises the stack-walking
 // resolver without VCR_TESTDATA_OVERRIDE. The caller of testvcr.New is this
 // _test.go file in internal/testvcr/, which stays eligible despite being in

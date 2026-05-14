@@ -3,7 +3,9 @@
 package testvcr
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -42,6 +44,12 @@ func New(t *testing.T, name string) http.RoundTripper {
 		t.Fatal(err)
 	}
 	path := resolvePath(t, name)
+	if Mode() == ModeReplay {
+		if _, err := os.Stat(path + ".yaml"); errors.Is(err, fs.ErrNotExist) {
+			t.Skipf("testvcr: cassette not recorded yet (%s.yaml)", path)
+			return nil
+		}
+	}
 	mode := recorder.ModeReplayOnly
 	if Mode() == ModeRecord {
 		mode = recorder.ModeRecordOnly
