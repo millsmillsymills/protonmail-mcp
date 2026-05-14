@@ -109,6 +109,7 @@ var srpIgnoredKeys = map[string]bool{
 	"ClientProof":     true,
 	"ClientEphemeral": true,
 	"SrpSession":      true,
+	"TwoFactorCode":   true,
 }
 
 func jsonEqualIgnoringRedactedAndProof(a, b any) bool {

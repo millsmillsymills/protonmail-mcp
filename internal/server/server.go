@@ -21,6 +21,12 @@ const (
 	serverVersion = "v0.1.0"
 )
 
+// RegisterAll attaches every v1 tool to srv against sess. Exposed so tests
+// can construct a server without owning the stdio transport.
+func RegisterAll(srv *mcp.Server, sess *session.Session) {
+	tools.Register(srv, tools.Deps{Session: sess})
+}
+
 // Run starts the stdio MCP server. Blocks until the host disconnects.
 func Run(ctx context.Context) error {
 	return RunWithOptions(ctx, defaultAPIURL, nil)

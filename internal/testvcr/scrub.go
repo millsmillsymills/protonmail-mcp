@@ -22,6 +22,7 @@ var sensitiveJSONKeys = map[string]bool{
 	"ServerProof":     true,
 	"ClientProof":     true,
 	"ClientEphemeral": true,
+	"TwoFactorCode":   true,
 }
 
 var redactedHeaders = []string{"Authorization", "X-Pm-Uid", "Cookie", "Set-Cookie"}
