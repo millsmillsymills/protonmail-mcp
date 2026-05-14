@@ -7,6 +7,11 @@ import (
 	"github.com/millsmillsymills/protonmail-mcp/internal/testvcr"
 )
 
+var softRules = map[string]bool{
+	"stale-cassette": true,
+	"version-drift":  true,
+}
+
 func main() {
 	roots := os.Args[1:]
 	if len(roots) == 0 {
@@ -22,8 +27,15 @@ func main() {
 	if len(findings) == 0 {
 		return
 	}
+	strict := os.Getenv("STRICT") == "1"
+	hardErr := false
 	for _, f := range findings {
 		fmt.Fprintf(os.Stderr, "%s:%d [%s] %s\n", f.Path, f.Line, f.Rule, f.Hit)
+		if !softRules[f.Rule] {
+			hardErr = true
+		}
 	}
-	os.Exit(1)
+	if hardErr || strict {
+		os.Exit(1)
+	}
 }

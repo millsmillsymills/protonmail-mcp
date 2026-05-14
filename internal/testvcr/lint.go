@@ -6,7 +6,12 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
+	"time"
 )
+
+// nowFunc is a package-level indirection so tests can freeze time.
+var nowFunc = time.Now
 
 // Finding describes one match of a forbidden pattern inside a cassette file.
 type Finding struct {
@@ -30,7 +35,10 @@ var lintRules = []lintRule{
 	{"proton-email", regexp.MustCompile(`@protonmail\.|@proton\.me`)},
 }
 
-// Scan walks root directories and returns findings for cassette lines matching forbidden patterns.
+const staleThreshold = 90 * 24 * time.Hour
+
+// Scan walks root directories and returns findings for cassette lines matching
+// forbidden patterns, plus staleness and version-drift findings from sidecars.
 func Scan(roots ...string) []Finding {
 	var out []Finding
 	for _, root := range roots {
@@ -38,7 +46,13 @@ func Scan(roots ...string) []Finding {
 			if err != nil || d.IsDir() {
 				return nil
 			}
-			if filepath.Ext(path) != ".yaml" && filepath.Ext(path) != ".yml" {
+			ext := filepath.Ext(path)
+			if ext != ".yaml" && ext != ".yml" {
+				return nil
+			}
+			// Sidecar files are scanned via scanMeta; skip them here.
+			if strings.HasSuffix(path, ".meta.yaml") {
+				out = append(out, scanMeta(path)...)
 				return nil
 			}
 			f, err := os.Open(path)
@@ -63,4 +77,85 @@ func Scan(roots ...string) []Finding {
 		})
 	}
 	return out
+}
+
+// scanMeta parses a .meta.yaml sidecar and returns staleness/version-drift findings.
+func scanMeta(path string) []Finding {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return []Finding{{Path: path, Rule: "read-error", Hit: err.Error()}}
+	}
+	var out []Finding
+	recordedAt, apiVer := parseMeta(string(data))
+	if !recordedAt.IsZero() && nowFunc().Sub(recordedAt) > staleThreshold {
+		out = append(out, Finding{
+			Path: path,
+			Rule: "stale-cassette",
+			Hit:  recordedAt.Format(time.RFC3339) + " > 90d old",
+		})
+	}
+	if apiVer != "" {
+		current := goProtonAPIVersion()
+		if current != "unknown" && apiVer != current {
+			out = append(out, Finding{
+				Path: path,
+				Rule: "version-drift",
+				Hit:  apiVer + " vs " + current,
+			})
+		}
+	}
+	return out
+}
+
+// parseMeta extracts recorded_at and go_proton_api_version from raw YAML text.
+func parseMeta(data string) (time.Time, string) {
+	var recordedAt time.Time
+	var apiVer string
+	for _, line := range strings.Split(data, "\n") {
+		if after, ok := strings.CutPrefix(line, "recorded_at:"); ok {
+			t, err := time.Parse(time.RFC3339, strings.TrimSpace(after))
+			if err == nil {
+				recordedAt = t
+			}
+		}
+		if after, ok := strings.CutPrefix(line, "go_proton_api_version:"); ok {
+			apiVer = strings.TrimSpace(after)
+		}
+	}
+	return recordedAt, apiVer
+}
+
+// GoProtonAPIVersion reads the go-proton-api version from go.mod.
+// Exported so tests can embed the current version into fixture metadata.
+func GoProtonAPIVersion() string {
+	return goProtonAPIVersion()
+}
+
+// goProtonAPIVersion reads the go-proton-api version from the nearest go.mod,
+// walking upward from the current working directory.
+func goProtonAPIVersion() string {
+	dir, err := os.Getwd()
+	if err != nil {
+		return "unknown"
+	}
+	for {
+		data, err := os.ReadFile(filepath.Join(dir, "go.mod"))
+		if err == nil {
+			for _, line := range strings.Split(string(data), "\n") {
+				if strings.Contains(line, "github.com/ProtonMail/go-proton-api") {
+					parts := strings.Fields(line)
+					if len(parts) >= 2 {
+						return parts[len(parts)-1]
+					}
+				}
+			}
+			return "unknown"
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+	return "unknown"
 }

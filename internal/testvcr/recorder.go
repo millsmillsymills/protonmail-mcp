@@ -3,6 +3,7 @@
 package testvcr
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -53,9 +54,17 @@ func New(t *testing.T, name string) http.RoundTripper {
 	if err != nil {
 		t.Fatalf("testvcr.New(%q): %v", name, err)
 	}
+	// Option C: write sidecar after Stop returns; the path is known here but
+	// not inside saveHook (which only receives a cassette.Interaction).
 	t.Cleanup(func() {
 		if err := r.Stop(); err != nil {
 			t.Errorf("testvcr.Stop: %v", err)
+			return
+		}
+		if Mode() == ModeRecord {
+			if err := writeMeta(path+".yaml", name); err != nil {
+				t.Errorf("testvcr: write meta: %v", err)
+			}
 		}
 	})
 	return r.GetDefaultClient().Transport
@@ -83,6 +92,17 @@ func resolvePath(t *testing.T, name string) string {
 	}
 	t.Fatal("testvcr: no caller frame outside testvcr/testharness")
 	return ""
+}
+
+// writeMeta stamps a sidecar <cassettePath>.meta.yaml alongside the YAML file.
+func writeMeta(cassettePath, scenario string) error {
+	meta := fmt.Sprintf(
+		"recorded_at: %s\ngo_proton_api_version: %s\nmcp_version: v0.1.0\nscenario: %s\n",
+		nowFunc().UTC().Format("2006-01-02T15:04:05Z"),
+		goProtonAPIVersion(),
+		scenario,
+	)
+	return os.WriteFile(cassettePath+".meta.yaml", []byte(meta), 0o644)
 }
 
 func guardRecordInCI() error {

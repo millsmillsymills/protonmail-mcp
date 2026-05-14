@@ -1,10 +1,13 @@
 package testvcr_test
 
 import (
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"testing"
+	"time"
 
 	"github.com/millsmillsymills/protonmail-mcp/internal/testvcr"
 )
@@ -97,5 +100,78 @@ func TestLintReportsReadError(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("expected read-error finding for %s; got %+v", path, got)
+	}
+}
+
+func writeMeta(t *testing.T, dir, filename, meta string) {
+	t.Helper()
+	p := filepath.Join(dir, filename)
+	if err := os.WriteFile(p, []byte(meta), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestLintWarnsOnStaleCassette(t *testing.T) {
+	dir := t.TempDir()
+	staleTime := time.Now().Add(-100 * 24 * time.Hour).UTC().Format(time.RFC3339)
+	meta := fmt.Sprintf(
+		"recorded_at: %s\ngo_proton_api_version: %s\nmcp_version: v0.1.0\nscenario: test\n",
+		staleTime, testvcr.GoProtonAPIVersion(),
+	)
+	writeMeta(t, dir, "stale.yaml.meta.yaml", meta)
+	got := testvcr.Scan(dir)
+	for _, f := range got {
+		if f.Rule == "stale-cassette" {
+			return
+		}
+	}
+	t.Fatalf("expected stale-cassette finding; got %+v", got)
+}
+
+func TestLintWarnsOnVersionDrift(t *testing.T) {
+	dir := t.TempDir()
+	meta := fmt.Sprintf(
+		"recorded_at: %s\ngo_proton_api_version: v0.0.0-old\nmcp_version: v0.1.0\nscenario: test\n",
+		time.Now().UTC().Format(time.RFC3339),
+	)
+	writeMeta(t, dir, "drift.yaml.meta.yaml", meta)
+	got := testvcr.Scan(dir)
+	for _, f := range got {
+		if f.Rule == "version-drift" {
+			return
+		}
+	}
+	t.Fatalf("expected version-drift finding; got %+v", got)
+}
+
+func TestStrictExitCode(t *testing.T) {
+	dir := t.TempDir()
+	// Write a stale sidecar (no leak — no hard error).
+	staleTime := time.Now().Add(-100 * 24 * time.Hour).UTC().Format(time.RFC3339)
+	meta := fmt.Sprintf(
+		"recorded_at: %s\ngo_proton_api_version: %s\nmcp_version: v0.1.0\nscenario: test\n",
+		staleTime, testvcr.GoProtonAPIVersion(),
+	)
+	writeMeta(t, dir, "stale.yaml.meta.yaml", meta)
+
+	run := func(strict bool) int {
+		cmd := exec.Command("go", "run", "./cmd/testvcr-lint", dir)
+		if strict {
+			cmd.Env = append(os.Environ(), "STRICT=1")
+		}
+		cmd.Dir = filepath.Join("..", "..")
+		if err := cmd.Run(); err != nil {
+			if exitErr, ok := err.(*exec.ExitError); ok {
+				return exitErr.ExitCode()
+			}
+		}
+		return 0
+	}
+
+	if code := run(false); code != 0 {
+		t.Fatalf("without STRICT: exit %d, want 0", code)
+	}
+	if code := run(true); code != 1 {
+		t.Fatalf("with STRICT=1: exit %d, want 1", code)
 	}
 }
