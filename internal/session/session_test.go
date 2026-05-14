@@ -4,10 +4,12 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/millsmillsymills/protonmail-mcp/internal/keychain"
 	"github.com/millsmillsymills/protonmail-mcp/internal/session"
+	"github.com/millsmillsymills/protonmail-mcp/internal/testvcr"
 	"github.com/zalando/go-keyring"
 )
 
@@ -177,5 +179,77 @@ func TestTOTPRoundsToSixDigits(t *testing.T) {
 	}
 	if len(code) != 6 {
 		t.Fatalf("want 6 digits, got %q", code)
+	}
+}
+
+func TestTokenRotationOnExpiredAccess(t *testing.T) {
+	keyring.MockInit()
+	kc := keychain.New()
+	if err := kc.SaveSession(keychain.Session{
+		UID:          "REDACTED_UID_1",
+		AccessToken:  "REDACTED_ACCESSTOKEN_1",
+		RefreshToken: "REDACTED_REFRESHTOKEN_1",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	rt := testvcr.New(t, "token_rotation")
+	sess := session.New("https://mail.proton.me/api", kc, session.WithTransport(rt))
+
+	c, err := sess.Client(context.Background())
+	if err != nil {
+		t.Fatalf("client: %v", err)
+	}
+	u, err := c.GetUser(context.Background())
+	if err != nil {
+		t.Fatalf("get user after rotation: %v", err)
+	}
+	if u.Email != "user@example.test" {
+		t.Fatalf("email = %v", u.Email)
+	}
+}
+
+func TestLogoutInvalidatesSession(t *testing.T) {
+	keyring.MockInit()
+	kc := keychain.New()
+	if err := kc.SaveSession(keychain.Session{
+		UID:          "REDACTED_UID_1",
+		AccessToken:  "REDACTED_ACCESSTOKEN_1",
+		RefreshToken: "REDACTED_REFRESHTOKEN_1",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	rt := testvcr.New(t, "logout_invalidates")
+	sess := session.New("https://mail.proton.me/api", kc, session.WithTransport(rt))
+	if err := sess.Logout(); err != nil {
+		t.Fatalf("logout: %v", err)
+	}
+	if _, err := kc.LoadSession(); err == nil {
+		t.Fatal("session still present after logout")
+	}
+}
+
+func TestRefreshRevoked(t *testing.T) {
+	keyring.MockInit()
+	kc := keychain.New()
+	if err := kc.SaveSession(keychain.Session{
+		UID:          "REDACTED_UID_1",
+		AccessToken:  "REDACTED_ACCESSTOKEN_1",
+		RefreshToken: "REDACTED_REFRESHTOKEN_1",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	rt := testvcr.New(t, "refresh_revoked")
+	sess := session.New("https://mail.proton.me/api", kc, session.WithTransport(rt))
+
+	c, err := sess.Client(context.Background())
+	if err != nil {
+		// Client() short-circuits when the cold-start refresh is rejected.
+		if !strings.Contains(err.Error(), "refresh") {
+			t.Fatalf("error = %v, want refresh error", err)
+		}
+		return
+	}
+	if _, err := c.GetUser(context.Background()); err == nil {
+		t.Fatal("expected error after revoked refresh token")
 	}
 }
