@@ -14,6 +14,35 @@ import (
 	"github.com/millsmillsymills/protonmail-mcp/internal/tools"
 )
 
+func TestWhoamiHappyCassette(t *testing.T) {
+	h := testharness.BootWithCassette(t, "whoami_happy")
+	defer h.Close()
+	out, err := h.Call(context.Background(), "proton_whoami", map[string]any{})
+	if err != nil {
+		t.Fatalf("call: %v", err)
+	}
+	for _, k := range []string{"email", "used_space_bytes", "max_space_bytes"} {
+		if _, ok := out[k]; !ok {
+			t.Fatalf("envelope missing %q", k)
+		}
+	}
+}
+
+func TestSessionStatusHappyCassette(t *testing.T) {
+	h := testharness.BootWithCassette(t, "session_status_happy")
+	defer h.Close()
+	out, err := h.Call(context.Background(), "proton_session_status", map[string]any{})
+	if err != nil {
+		t.Fatalf("call: %v", err)
+	}
+	if v, ok := out["logged_in"]; !ok || v != true {
+		t.Fatalf("logged_in = %v, want true", out["logged_in"])
+	}
+	if _, ok := out["email"]; !ok {
+		t.Fatalf("envelope missing %q", "email")
+	}
+}
+
 func TestWhoamiRoundTrip(t *testing.T) {
 	h := testharness.BootDevServer(t, "user@example.test", "hunter2")
 	defer h.Close()

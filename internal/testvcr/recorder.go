@@ -78,6 +78,40 @@ func New(t *testing.T, name string) http.RoundTripper {
 	return r.GetDefaultClient().Transport
 }
 
+// NewAtPath constructs a recorder bound to an explicit cassette path. Used by
+// the recording CLI, which assembles cassette destinations itself. The path is
+// passed verbatim to recorder.New; go-vcr appends .yaml.
+//
+// Returns the underlying RoundTripper and a stop function that flushes the
+// cassette and writes the metadata sidecar (in record mode). The caller is
+// responsible for calling stop().
+func NewAtPath(path string, mode RecorderMode) (http.RoundTripper, func(), error) {
+	if err := guardRecordInCI(); err != nil {
+		return nil, nil, err
+	}
+	rmode := recorder.ModeReplayOnly
+	if mode == ModeRecord {
+		rmode = recorder.ModeRecordOnly
+	}
+	r, err := recorder.New(path,
+		recorder.WithMode(rmode),
+		recorder.WithMatcher(BodyAwareMatcher),
+		recorder.WithHook(saveHook, recorder.BeforeSaveHook),
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+	stop := func() {
+		if err := r.Stop(); err != nil {
+			return
+		}
+		if mode == ModeRecord {
+			_ = writeMeta(path+".yaml", filepath.Base(path))
+		}
+	}
+	return r.GetDefaultClient().Transport, stop, nil
+}
+
 func resolvePath(t *testing.T, name string) string {
 	t.Helper()
 	if override := os.Getenv("VCR_TESTDATA_OVERRIDE"); override != "" {
