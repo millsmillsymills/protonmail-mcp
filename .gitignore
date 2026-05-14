@@ -27,4 +27,5 @@ coverage.txt
 # Recording
 .env.record
 cov.out
+cov.out.func
 cov.html
