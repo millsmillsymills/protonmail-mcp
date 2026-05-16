@@ -33,6 +33,8 @@ jobs:
         run: go vet ./...
       - name: build
         run: go build ./...
+      - name: verify cassettes (scrub-leak scan)
+        run: make verify-cassettes
       - name: govulncheck
         run: |
           go install golang.org/x/vuln/cmd/govulncheck@v1.3.0
