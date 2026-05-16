@@ -14,6 +14,8 @@ func TestRequireCassettesPresent(t *testing.T) {
 		{"truthy 1", "1", true},
 		{"truthy true", "true", true},
 		{"any non-falsy value", "yes", true},
+		{"case-sensitive False is truthy", "False", true},
+		{"case-sensitive FALSE is truthy", "FALSE", true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

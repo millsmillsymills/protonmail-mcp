@@ -181,6 +181,10 @@ func requireCassettesPresent() bool {
 	return envTruthy("CI_REQUIRE_CASSETTES")
 }
 
+// envTruthy reports whether an env var is set to anything other than the empty
+// string, "0", or lowercase "false". Comparison is case-sensitive: "False" and
+// "FALSE" count as truthy. The narrow falsy set matches the existing
+// guardRecordInCI convention so the two CI-related env probes share semantics.
 func envTruthy(key string) bool {
 	v := os.Getenv(key)
 	return v != "" && v != "false" && v != "0"
