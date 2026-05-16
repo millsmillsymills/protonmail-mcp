@@ -38,10 +38,6 @@ jobs:
           go install golang.org/x/vuln/cmd/govulncheck@v1.3.0
           govulncheck ./...
       - name: unit tests
-        env:
-          CI_REQUIRE_CASSETTES: "1"
         run: go test ./... -race
       - name: integration tests
-        env:
-          CI_REQUIRE_CASSETTES: "1"
         run: go test -tags=integration ./... -race

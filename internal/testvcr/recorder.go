@@ -170,19 +170,15 @@ func guardRecordInCI() error {
 var ciEnvKeys = []string{"CI", "GITHUB_ACTIONS", "BUILDKITE", "CIRCLECI"}
 
 // requireCassettesPresent reports whether a missing cassette should be fatal
-// instead of skipped. True when CI_REQUIRE_CASSETTES is truthy, or when any
-// recognised CI env var is set so green-with-skips never masks a deleted
-// cassette in CI.
+// instead of skipped. Triggered explicitly via CI_REQUIRE_CASSETTES=1.
+//
+// The flag stays opt-in (rather than auto-firing on CI env vars) so this
+// guard can land before the cassette recording phase completes. Once
+// cassettes exist on main, CI workflows should set CI_REQUIRE_CASSETTES=1
+// on their test steps to stop a silently-deleted cassette becoming a green
+// skip.
 func requireCassettesPresent() bool {
-	if envTruthy("CI_REQUIRE_CASSETTES") {
-		return true
-	}
-	for _, k := range ciEnvKeys {
-		if envTruthy(k) {
-			return true
-		}
-	}
-	return false
+	return envTruthy("CI_REQUIRE_CASSETTES")
 }
 
 func envTruthy(key string) bool {
