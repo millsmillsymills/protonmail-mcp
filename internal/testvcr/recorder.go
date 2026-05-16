@@ -47,6 +47,9 @@ func New(t *testing.T, name string) http.RoundTripper {
 	path := resolvePath(t, name)
 	if Mode() == ModeReplay {
 		if _, err := os.Stat(path + ".yaml"); errors.Is(err, fs.ErrNotExist) {
+			if requireCassettesPresent() {
+				t.Fatalf("testvcr: cassette not recorded (%s.yaml); record it or unset CI_REQUIRE_CASSETTES", path)
+			}
 			t.Skipf("testvcr: cassette not recorded yet (%s.yaml)", path)
 			return nil
 		}
@@ -156,12 +159,35 @@ func guardRecordInCI() error {
 	if Mode() != ModeRecord {
 		return nil
 	}
-	for _, k := range []string{"CI", "GITHUB_ACTIONS", "BUILDKITE", "CIRCLECI"} {
-		if v := os.Getenv(k); v != "" && v != "false" && v != "0" {
+	for _, k := range ciEnvKeys {
+		if envTruthy(k) {
 			return &CIRecordError{Env: k}
 		}
 	}
 	return nil
+}
+
+var ciEnvKeys = []string{"CI", "GITHUB_ACTIONS", "BUILDKITE", "CIRCLECI"}
+
+// requireCassettesPresent reports whether a missing cassette should be fatal
+// instead of skipped. True when CI_REQUIRE_CASSETTES is truthy, or when any
+// recognised CI env var is set so green-with-skips never masks a deleted
+// cassette in CI.
+func requireCassettesPresent() bool {
+	if envTruthy("CI_REQUIRE_CASSETTES") {
+		return true
+	}
+	for _, k := range ciEnvKeys {
+		if envTruthy(k) {
+			return true
+		}
+	}
+	return false
+}
+
+func envTruthy(key string) bool {
+	v := os.Getenv(key)
+	return v != "" && v != "false" && v != "0"
 }
 
 // CIRecordError is returned when VCR_MODE=record is set in a CI environment.

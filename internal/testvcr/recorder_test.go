@@ -40,6 +40,9 @@ func TestNewSkipsWhenCassetteMissing(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("VCR_TESTDATA_OVERRIDE", dir)
 	t.Setenv("VCR_MODE", "replay")
+	for _, k := range []string{"CI_REQUIRE_CASSETTES", "CI", "GITHUB_ACTIONS", "BUILDKITE", "CIRCLECI"} {
+		t.Setenv(k, "")
+	}
 
 	var ran bool
 	var skipped bool
