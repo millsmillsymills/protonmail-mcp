@@ -18,12 +18,13 @@ import (
 // comparison, the two segments are treated as interchangeable so a replay with
 // a different ID still hits its recorded interaction.
 //
-// Tolerance assumption: static path segments long enough to also match this
-// regex (e.g. "addresses" at 9 chars, "mailsettings" at 12) are identical on
-// both request and cassette and so compare equal in pathsMatch before this
-// regex is consulted. If a future static segment with a length >=8 ever
-// differs in case or spelling between request and cassette, the tolerance
-// would mask the mismatch — keep the constant API path strings in sync.
+// Tolerance assumption: pathsMatch tries byte-equal comparison first and only
+// consults this regex on mismatched segments, so static API path segments
+// whose length happens to be >=8 are unaffected as long as they stay
+// byte-equal on both request and cassette. A future static segment that
+// differs by case or spelling between the two and is also alphanumeric/
+// underscore/hyphen-only would be silently tolerated — keep constant API
+// path strings in sync.
 var opaqueIDSegment = regexp.MustCompile(`^[A-Za-z0-9_\-]{8,}$`)
 
 // BodyAwareMatcher matches an incoming request against a recorded interaction.

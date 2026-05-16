@@ -51,11 +51,12 @@ func TestDeleteAddressHappy(t *testing.T) {
 }
 
 // TestSetAddressStatusOffHappy and TestSetAddressStatusOnHappy replay from the
-// same cassette `address_status_toggle`. Each sub-test gets a fresh recorder
-// via testvcr.New, which re-opens the cassette and resets the interaction
-// cursor to zero — go-vcr v4.0.6 behaviour. If a future upgrade ever changes
-// that (e.g. shared cursor across recorders bound to the same file), the
-// cassette would need to be split into per-test recordings.
+// same cassette `address_status_toggle`. Each test gets a fresh recorder via
+// testvcr.New, which calls cassette.LoadWithFS and so unmarshals an
+// independent set of *Interaction values whose per-interaction `replayed`
+// flags start false — current go-vcr v4 behaviour. If a future upgrade ever
+// changes that (e.g. interaction state shared across recorders bound to the
+// same file), the cassette would need to be split into per-test recordings.
 func TestSetAddressStatusOffHappy(t *testing.T) {
 	t.Setenv("PROTONMAIL_MCP_ENABLE_WRITES", "1")
 	h := testharness.BootWithCassette(t, "address_status_toggle")
