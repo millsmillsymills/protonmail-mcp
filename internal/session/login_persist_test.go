@@ -117,29 +117,45 @@ func TestPersistLoginStateSucceedsClean(t *testing.T) {
 // so we can confirm the rollback secondary failure is surfaced.
 type clearFailingStore struct {
 	*keychain.Keychain
+	saveErr  error
+	clearErr error
 }
 
-func (c *clearFailingStore) SaveSession(_ keychain.Session) error {
-	return errors.New("save fail")
-}
-func (c *clearFailingStore) Clear() error {
-	return errors.New("clear fail")
-}
+func (c *clearFailingStore) SaveSession(_ keychain.Session) error { return c.saveErr }
+func (c *clearFailingStore) Clear() error                         { return c.clearErr }
 
 func TestRollbackSurfacesSecondaryFailure(t *testing.T) {
 	keyring.MockInit()
 	store := &clearFailingStore{Keychain: keychain.New()}
+
+	savePrimary := errors.New("save fail")
+	clearSecondary := errors.New("clear fail")
+	store.saveErr = savePrimary
+	store.clearErr = clearSecondary
+
 	err := persistLoginState(store,
 		keychain.Creds{Username: "u", Password: "p"},
 		keychain.Session{UID: "uid", AccessToken: "at", RefreshToken: "rt"})
 	if err == nil {
 		t.Fatal("expected error")
 	}
-	msg := err.Error()
-	if !strings.Contains(msg, "save session") || !strings.Contains(msg, "save fail") {
-		t.Fatalf("missing primary cause: %v", err)
+	// errors.Is must reach both the primary cause and the secondary failure
+	// through the errors.Join wrapper. If this regresses, callers can no
+	// longer typed-check the cause.
+	if !errors.Is(err, savePrimary) {
+		t.Fatalf("primary cause unreachable via errors.Is: %v", err)
 	}
-	if !strings.Contains(msg, "login rollback") || !strings.Contains(msg, "clear fail") {
-		t.Fatalf("missing rollback cause: %v", err)
+	if !errors.Is(err, clearSecondary) {
+		t.Fatalf("secondary cause unreachable via errors.Is: %v", err)
+	}
+	msg := err.Error()
+	if !strings.Contains(msg, "save session") {
+		t.Fatalf("missing primary op tag: %v", err)
+	}
+	if !strings.Contains(msg, "login rollback") {
+		t.Fatalf("missing rollback op tag: %v", err)
+	}
+	if !strings.Contains(msg, "protonmail-mcp logout") {
+		t.Fatalf("missing recovery hint: %v", err)
 	}
 }

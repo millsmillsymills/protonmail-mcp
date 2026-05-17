@@ -262,7 +262,13 @@ func persistLoginState(kc keychainStore, creds keychain.Creds, sess keychain.Ses
 func rollbackLoginPersist(kc keychainStore, op string, cause error) error {
 	primary := fmt.Errorf("%s: %w", op, cause)
 	if rerr := kc.Clear(); rerr != nil {
-		return errors.Join(primary, fmt.Errorf("login rollback: %w", rerr))
+		// Clear failed — keychain may hold partial state that can't be
+		// reconciled here. Surface a recovery hint so the user knows to
+		// invoke `protonmail-mcp logout` (which re-tries Clear) before
+		// the next login attempt.
+		return errors.Join(primary, fmt.Errorf(
+			"login rollback: %w (keychain may be inconsistent; run `protonmail-mcp logout` to clear)",
+			rerr))
 	}
 	return primary
 }
