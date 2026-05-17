@@ -59,7 +59,8 @@ func runLogin(
 				"WARNING: a one-shot code was provided. Future automatic refreshes will fail;"+
 					" you'll need to log in again when the session expires.")
 		} else {
-			return errors.New("input is neither an otpauth:// URI nor a 6-digit code")
+			return fmt.Errorf(
+				"2FA input invalid (expected otpauth:// URI or 6-digit code): %w", err)
 		}
 		err = sess.Login(ctx, in)
 	}
@@ -80,7 +81,8 @@ func promptReader(out io.Writer, r *bufio.Reader, label string) (string, error) 
 	if err != nil && !errors.Is(err, io.EOF) {
 		return "", err
 	}
-	line = strings.TrimRight(line, "\r\n")
+	line = strings.TrimSuffix(line, "\n")
+	line = strings.TrimSuffix(line, "\r")
 	if errors.Is(err, io.EOF) && line == "" {
 		return "", errors.New("unexpected EOF reading input")
 	}
@@ -101,7 +103,8 @@ func readPassword(out io.Writer, stdin io.Reader, fallback *bufio.Reader) (strin
 	if err != nil && !errors.Is(err, io.EOF) {
 		return "", err
 	}
-	line = strings.TrimRight(line, "\r\n")
+	line = strings.TrimSuffix(line, "\n")
+	line = strings.TrimSuffix(line, "\r")
 	if errors.Is(err, io.EOF) && line == "" {
 		return "", errors.New("unexpected EOF reading password")
 	}
